@@ -109,7 +109,7 @@ folders = {"images":config.get("Files",'imagesfolder'),
 "music":config.get("Files",'musicfolder'),
 "fonts":config.get("Files",'fontsfolder')}
 
-pygame.init() # Init pygame now so that other files can use it without having to wait.
+pygame.init() # Init pygame now so that other files can use it without having to wait
 
 import ships
 import enemies
