@@ -1,0 +1,7 @@
+Optimized the menus. They now run around three times faster.
+Improved dealing with non-implemented features.
+Added (Non-working) settings screen.
+Added a basic recording feature. Does not record audio.
+Made enemies that shoot in directions other than the cardinals.
+Cleaned up and optmized code. Including restructuring some file locations.
+Added a .cfg file and moved many previously hard-coded settings there. Need to set these things in the settings screen next.
