@@ -175,7 +175,7 @@ def blitDebugInfo(fps, currentState, fullscreen, surf, font, maxfps, pos=(0,0)):
     debugString = "FPS: %i STATE: %s"%(fps, currentState.name)
     
     if "gamemode" in currentState.vars:
-        debugString = debugString + " MODE: %s"%(fps, currentState.name, currentState.vars['gamemode'])
+        debugString = debugString + " MODE: %s"%(currentState.vars['gamemode'])
     
     if fullscreen:
         debugString = debugString + " FULLSCREEN"
