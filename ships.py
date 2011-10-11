@@ -14,6 +14,11 @@
 # along with For The New Lunar Republic.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os, random
+import logging
+
+log = logging.getLogger(__name__)
+
+log.debug("Module initialized.")
 
 import pygame
 from pygame.locals import *
@@ -132,7 +137,7 @@ class Ship(pygame.sprite.Sprite):
         
     def calcStats(self):
         self.fireInterval = 10000.0/self.stats['frate']
-        self.maxHealth = 5000.0/self.stats['shields']
+        self.maxHealth = 5*self.stats['shields']
         self.health = self.maxHealth
     
     def update(self, pressedKeys, time, bulletGroup=None):

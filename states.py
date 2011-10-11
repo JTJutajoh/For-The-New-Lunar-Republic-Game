@@ -14,9 +14,14 @@
 # along with For The New Lunar Republic.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os
+import logging
+
+log = logging.getLogger(__name__)
 
 import pygame
 from pygame.locals import *
+
+log.debug("Module initialized.")
 
 
 class State(object):
@@ -25,3 +30,6 @@ class State(object):
         self.name = name
         
         self.vars = vars
+        
+    def __str__(self):
+        return "State: %s"%self.name

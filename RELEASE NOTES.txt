@@ -1,7 +1,8 @@
-Optimized the menus. They now run around three times faster.
-Improved dealing with non-implemented features.
-Added (Non-working) settings screen.
-Added a basic recording feature. Does not record audio.
-Made enemies that shoot in directions other than the cardinals.
-Cleaned up and optmized code. Including restructuring some file locations.
-Added a .cfg file and moved many previously hard-coded settings there. Need to set these things in the settings screen next.
+Implemented logging. There are two separate handlers for the log file and the console window. They default to DEBUG and WARNING respectively.
+Made the game pause when it loses focus.
+Somehow managed to break the no scaling option in fullscreen. For now that's going to remain broken.
+Added a working fullscreen toggle to the settings screen. It saves your setting in the cfg file too.
+Added a working settings button to the pause menu. It saves your current position in the game too.
+Added a level selection screen for Arcade mode. It's slightly incomplete, but the rest will have to wait for implementation of levels themselves. (Like thumbnails and descriptions.)
+Added sound option to settings screen. It saves to your cfg file too.
+Added levels. It's too complicated for this file to list everything about them. I'll list everything about them on the tumblr blog.

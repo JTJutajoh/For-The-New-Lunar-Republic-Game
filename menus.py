@@ -14,11 +14,17 @@
 # along with For The New Lunar Republic.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os
+import logging
+
+log = logging.getLogger(__name__)
 
 import pygame
 from pygame.locals import *
 
 import ships # This allows the char select buttons to show the ships themselves and their stats
+import levels # Same as above, but for levels.
+
+log.debug("Module initialized.")
 
 bm = pygame.time.Clock() # Benchmark clock
 
@@ -37,6 +43,8 @@ class Button(pygame.sprite.Sprite):
         # Keyboard is hard-coded to be disabled. It makes the buttons act strangely, so for now there are no keyboard controls for the buttons.
         
         self.hidden = False
+        
+        self.hovered = False # Used only for checkbuttons for now.
         
     def loadImages(self, imageName, posOrientation=0):
         # Logically find the other files in the same directory specifically named.
@@ -58,10 +66,12 @@ class Button(pygame.sprite.Sprite):
             self.rect.topright = self.pos
     
     def update(self, time):
+        self.hovered = False
         if self.state == 0:
             self.image = self.images[0].copy()
         elif self.state == 1:
             self.image = self.images[1].copy()
+            self.hovered = True
         elif self.state == 2:
             self.image = self.images[2].copy()
         elif self.state == 3:
@@ -144,12 +154,81 @@ class CharButton(Button):
         
         self.shipImageRect = self.shipImage.get_rect()
         self.shipImageRect.center = self.shipDrawLoc
+        
+class LevelButton(Button):
+    
+    def __init__(self, level, name, thumbDrawLoc, levelNameFont, pos=(0,0), groups=[]):
+        Button.__init__(self, name, pos, groups)
+        
+        self.level = level
+        self.thumbDrawLoc = thumbDrawLoc # Where on the button should the thumb be drawn?
+        
+        self.levelNameFont = levelNameFont
+        
+        self.extraFolder = "LevelSelectButtons"
+        
+        self.name = "LEVEL_"+self.name # Add the SHIP_ prefix so that the menu handler can determine that this is a special button without checking instance types.
+        
+    def loadImages(self, imageName, posOrientation=0):
+        Button.loadImages(self, imageName, posOrientation)
+        # self.thumbImage = pygame.surface.Surface((32,32))
+        # self.thumbImage.fill((200,175,25))
+        
+        self.thumbImage = self.level.thumbnail
+            
+        self.genDescripImage()
+    
+    def genDescripImage(self):
+        # Pre-generate the stat image in order to improve performance. The stat image should not have any reason to change.
+        #even if it does, this function can just be called again.
+        self.descripImage = pygame.surface.Surface(self.rect.size, SRCALPHA)
+        nameSurf = self.levelNameFont.render(self.level.name, True, (255,255,255))
+        nameRect = nameSurf.get_rect()
+        nameRect.centerx = self.rect.width/2
+        nameRect.top = 98
+        self.descripImage.blit(nameSurf, nameRect.topleft)
+        
+        # self.descripImage = pygame.surface.Surface(self.rect.size, SRCALPHA)
+        description = self.level.description[0]
+        nameSurf = self.levelNameFont.render(description, True, (255,255,255))
+        nameRect = nameSurf.get_rect()
+        nameRect.centerx = self.rect.width/2
+        nameRect.top = 110
+        self.descripImage.blit(nameSurf, nameRect.topleft)
+    
+    def update(self, time):
+        Button.update(self, time)
+        
+        self.thumbImageRect = self.thumbImage.get_rect()
+        self.thumbImageRect.center = self.thumbDrawLoc
              
 class CheckButton(Button):
     # Intended for the settings screen.
     
-    def __init__(self, name, pos=(0,0), groups=[]):
+    def __init__(self, name, pos=(0,0), initialState=False, groups=[]):
         Button.__init__(self, name, pos, groups)
+        
+        self.extraFolder = "SettingsButtons"
+        
+        # This button has an extra state: 4
+        # State 4 means that the button is in checked mode.
+        # There's also a self.checked variable too.
+        self.checked = initialState
+        
+        self.name = "CHECK_"+self.name # Add the CHECK_ prefix so that the menu handler can determine that this is a special button without checking instance types.
+    
+    def loadImages(self, imageName, posOrientation=0):
+        Button.loadImages(self, imageName, posOrientation)
+        self.images.append(pygame.image.load(os.path.join("images","Buttons",self.extraFolder,imageName+" Checked.png")).convert_alpha())
+        self.images.append(pygame.image.load(os.path.join("images","Buttons",self.extraFolder,imageName+" Hovered Checked.png")).convert_alpha())
+    
+    def update(self, time):
+        Button.update(self, time)
+        if self.checked:
+            if self.hovered:
+                self.image = self.images[4].copy()
+            else:
+                self.image = self.images[3].copy()
   
     
 class Menu(pygame.sprite.Group):
@@ -158,6 +237,8 @@ class Menu(pygame.sprite.Group):
         pygame.sprite.Group.__init__(self, [])
         
         self.buttons = []
+        
+        self.checkedButtons = []
         
         self.allowKeys = allowKeys
         
@@ -173,6 +254,7 @@ class Menu(pygame.sprite.Group):
     def reinit(self):
         self.pressedButton = None
         self.pressedShipButton = None # This is for selecting ships on the ship select screen only. It allows the ship select buttons to work independently from the other button(s)
+        self.pressedLevelButton = None
         for button in self.buttons:
             button.state = 0
         self.selectedButton = 0 # -1 means that no selection has been made.
@@ -182,12 +264,24 @@ class Menu(pygame.sprite.Group):
         newButton.loadImages(images, posOrientation)
         self.buttons.append(newButton)
         
+    def makeNewLevelSelectButton(self, level, name, thumbDrawLoc, images, pos, levelNameFont, posOrientation=1):
+        newButton = LevelButton(level, name, thumbDrawLoc, levelNameFont, pos, self)
+        newButton.loadImages(images, posOrientation)
+        self.buttons.append(newButton)
+        
     def makeNewCharSelectButton(self, ship, shipDrawLoc, name, images, pos, shipNameFont, posOrientation=1):
         newButton = CharButton(ship, shipDrawLoc, name, shipNameFont, pos, self)
         newButton.loadImages(images, posOrientation)
         self.buttons.append(newButton)
         
-    def everyFrame(self, pressedKeys, mouseEvents):
+    def makeNewCheckButton(self, name, images, pos, initialState, posOrientation=1):
+        newButton = CheckButton(name, pos, initialState, self)
+        newButton.loadImages(images, posOrientation)
+        self.buttons.append(newButton)
+    
+    def update(self, pressedKeys, mouseEvents, time):
+        pygame.sprite.Group.update(self, time)
+        
         mPos = pygame.mouse.get_pos()
         
         for button in self.buttons:
@@ -219,26 +313,50 @@ class Menu(pygame.sprite.Group):
                     for e in mouseEvents:
                         if e.button == 1:
                             if button.state == 1 or button.state == 3:
-                                if not "SHIP_" in button.name:
+                                if "CHECK_" in button.name:
+                                    if button.checked:
+                                        button.checked = False
+                                        # if button.name[6:] in self.checkedButtons:
+                                            # self.checkedButtons.remove(button.name[6:])
+                                    else:
+                                        button.checked = True
+                                        # self.checkedButtons.append(button.name[6:])
+                                    button.state = 4
+                                elif "LEVEL_" in button.name:
                                     button.state = 2
-                                else:
+                                    self.pressedLevelButton = button.name
+                                elif "SHIP_" in button.name:
                                     button.state = 2
                                     self.pressedShipButton = button.name
-                                
-                    if K_RETURN in pressedKeys:
-                        if button.state == 1 or button.state == 3:
-                            button.state = 2
+                                else:
+                                    button.state = 2
+                    
+                    if "CHECK_" in button.name:
+                        if button.checked:
+                            if not button.name[6:] in self.checkedButtons:
+                                self.checkedButtons.append(button.name[6:])
+                        else:
+                            if button.name[6:] in self.checkedButtons:
+                                self.checkedButtons.remove(button.name[6:])
+                        
+                        if K_RETURN in pressedKeys:
+                            if button.state == 1 or button.state == 3:
+                                button.state = 2
                                 
                                 
                 if button.state == 2:
-                    if not "SHIP_" in button.name:
+                    if not "SHIP_" in button.name and not "CHECK_" in button.name and not "LEVEL_" in button.name:
                         self.pressedButton = button.name
+                    elif "CHECK_" in button.name:
+                        pass
+                    elif "LEVEL_" in button.name:
+                        if not button.name == self.pressedLevelButton:
+                            button.state = 0
                     else:
                         if not button.name == self.pressedShipButton:
                             button.state = 0
             else:
                 self.remove(button) # If the button is set to be hidden.
-                
                 
     def draw(self, surf):
         surf.blit(self.bgImage, self.rect.topleft)
@@ -250,6 +368,10 @@ class Menu(pygame.sprite.Group):
                 shipLoc = button.shipImageRect.topleft
                 surf.blit(button.shipImage, (shipLoc[0]+button.rect.left, shipLoc[1]+button.rect.top))
                 # Blit them directly to surf so that the game will run faster in case surf is the display surface.
+            elif "LEVEL_" in button.name:
+                surf.blit(button.descripImage, button.rect.topleft)
+                thumbLoc = button.thumbImageRect.topleft
+                surf.blit(button.thumbImage, (thumbLoc[0]+button.rect.left, thumbLoc[1]+button.rect.top))
         
         # Blit all the header text
         for header in self.textInfo.iterkeys():

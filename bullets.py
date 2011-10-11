@@ -15,6 +15,11 @@
 
 import sys, os
 import math
+import logging
+
+log = logging.getLogger(__name__)
+
+log.debug("Module initialized.")
 
 import pygame
 from pygame.locals import *

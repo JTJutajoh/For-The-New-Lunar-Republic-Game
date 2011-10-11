@@ -14,6 +14,11 @@
 # along with For The New Lunar Republic.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os
+import logging
+
+log = logging.getLogger(__name__)
+
+log.debug("Module initialized.")
 
 import pygame
 from pygame.locals import *
@@ -116,3 +121,5 @@ class AlphaEnemy(Enemy):
         Enemy.__init__(self, pos, boundingRect, bulletGroup, target, moveSpeed, groups)
         
         self.loadImages()
+        
+enemyTypes = {"AlphaEnemy":AlphaEnemy}

@@ -14,8 +14,13 @@
 # along with For The New Lunar Republic.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os
+import logging
+
+log = logging.getLogger(__name__)
 
 import pygame
 from pygame.locals import *
 
 # The other half of the content will be here pretty much.
+
+log.debug("Module initialized.")

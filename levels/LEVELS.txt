@@ -1,0 +1,2 @@
+[ARCADE]Test Level
+[STORY]Test Story
