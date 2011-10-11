@@ -45,7 +45,7 @@
 __version__ = "prerelease 5"
 __author__ = "J.T. Johnson"
 releaseNotes = file("RELEASE NOTES.txt", 'r').readlines()
-cfgFilename = "For The New Lunar Republic.cfg"
+cfgFilename = "For The New Lunar Republic.cfg" 
 
 import sys, os
 import random
