@@ -645,7 +645,7 @@ while not done:
             menu.draw(menuSurf)
             fadeInMenu(menu.bgImage)
         if fadeSurf.get_alpha() > 0:
-            pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".mp3"))
+            pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".wav"))
             pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
             if sound:
                 pygame.mixer.music.play(-1)

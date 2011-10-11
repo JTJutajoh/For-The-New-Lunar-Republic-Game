@@ -213,7 +213,7 @@ class Level(object):
         self.enemyGroup = pygame.sprite.RenderUpdates()
         
         currentSong = self.levelInfo["GeneralInfo"]['song']
-        pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".mp3"))
+        pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".wav"))
             
     def update(self, pressedKeys, time):
         #TODO take all management from the mainloop and put it here.
