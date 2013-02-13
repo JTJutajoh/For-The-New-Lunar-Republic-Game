@@ -813,6 +813,7 @@ while not done:
             
             shipHub.update(time, keyEvents, mouseEvents)
             shipHub.draw(screen)
+            subState.name = "cutscene"
         
         elif subState.name == "dialog":
             pygame.mouse.set_visible(False)

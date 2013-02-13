@@ -257,7 +257,7 @@ class Level(object):
         self.bossWarningFlashInterval = 100.
         
         currentSong = self.levelInfo["GeneralInfo"]['song']
-        pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".wav"))
+        pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".ogg"))
         
         self.loadDialog()
             

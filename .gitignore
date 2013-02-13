@@ -3,5 +3,5 @@
 *.log
 *.xcf
 
-*.mp3
+/music/mp3s
 *.wav
