@@ -19,30 +19,28 @@
 # Please do not redistribute this game without my permission, I'd like to follow its progress everywhere that it's posted. See the Readme for my email.
 
 #TODO:
-# Clean up code
-# Optimize code
 #Arcade Mode:
-# Seeking bullets?
-# Add HUD
-# Add boss battles
-# Make tutorial
+# Give player ship other types of weapons like shotgun and lazer
+# Seeking bullets
 # Create levels
-#Extras:
+# Balance
+# Powerups
+# Add level complete screen
+#Technical stuff:
+# Fix fullscreen scaling
 # Add remmappable buttons
-# Add option for manual firing
+#Extras:
 # Joystick/pad support?
 # Co-Op Multiplayer?
 # Score leaderboards?
 #Story Mode:
-# Add hubs
 # Add RPG elements
 # Add savegames
-# Add cutscene states (And make them work!)
-# Get ingame dialog working
+# Add All Your Base reference
+# Flesh out hubs
 # MAKE CONTENT!
-# Add All Your Base reference...
 
-__version__ = "prerelease 5"
+__version__ = "prerelease 6"
 __author__ = "J.T. Johnson"
 releaseNotes = file("RELEASE NOTES.txt", 'r').readlines()
 cfgFilename = "For The New Lunar Republic.cfg" 
@@ -109,6 +107,14 @@ config = inifiles.main({
     "Fonts":{
         "debugfont":"COURBD.TTF",
         "mainheaderfont":"BEBAS.TTF"
+        },
+    "Controls":{
+        "manualfiring":0,
+        "upkey":K_w,
+        "rightkey":K_d,
+        "downkey":K_s,
+        "leftkey":K_a,
+        "firekey":K_SPACE
         }
     },
     {
@@ -185,9 +191,15 @@ log.info("Number of successful initialized pygame modules: %i Unsuccessful ones:
 try:
     import ships
     import enemies
+    import bosses
     import levels
     import states
     import menus
+    import hud
+    import cutscenes
+    import story
+    import dialog
+    import shiphub as shipHubModule
 except ImportError, e:
     log.exception("Failed to import local modules: %s"%e)
     raise
@@ -200,7 +212,8 @@ if sys.platform == 'win32':
         os.environ['SDL_VIDEO_WINDOW_POS'] = '%i,%i'%(config.getint("Display", "windowloc_x"),config.getint("Display", "windowloc_y"))
     log.debug("Centered window")
 
-screenRect = Rect(0,0, 1000,500)
+# screenRect = Rect(0,0, 1000,500)
+screenRect = Rect(0,0, 1280,720)
 
 videoInfo = pygame.display.Info() # Used primarily to get the user's desktop resolution, but for other things too maybe.
 log.debug("Video memory available: %i (If it says 0, that means the system didn't tell me)"%videoInfo.video_mem)
@@ -219,7 +232,7 @@ def setWindowedMode():
         screen = pygame.display.set_mode(screenRect.size)
     
     return screen
-    
+
 def setFullscreenMode(scaling):
     log.info("Setting mode to fullscreen")
     if not videoInfo.hw:
@@ -230,18 +243,19 @@ def setFullscreenMode(scaling):
     else:
         screen = pygame.display.set_mode((videoInfo.current_w,videoInfo.current_h), FULLSCREEN | HWSURFACE | DOUBLEBUF)
         screenRect.center = screen.get_rect().center
-        #TODO Noscaling is broken.
     
     return screen
-    
+
 # Decide how to display the window based on the command line arguments and the config file.
 if "-fullscreen" in sys.argv or config.getboolean("Display", 'fullscreen') or not videoInfo.wm:
     if not videoInfo.wm:
         log.warning("Your platform does not support windowed mode.")
     if not config.getboolean("Display", 'fullscaling') or "-noscale" in sys.argv:
         screen = setFullscreenMode(scaling=False)
+        scaling = False
     else:
         screen = setFullscreenMode(scaling=True)
+        scaling = True
     fullscreen = True
 else:
     screen = setWindowedMode()
@@ -254,29 +268,36 @@ pygame.display.set_caption("For The New Lunar Republic")
 
 levels.initModule() # Now that the video mode has been set.
 
-def blitDebugInfo(fps, currentState, fullscreen, surf, font, maxfps, pos=(0,0)):
-    surf.fill((0,255,0))
+def blitDebugInfo(fps, currentState, subState, fullscreen, surf, font, maxfps, pos=(0,0)):
+    surf.fill((0,0,0,0))
     color = (255,255,255)
     if fps < maxfps: color = (255,100,100)
     
-    debugString = "FPS: %i STATE: %s"%(fps, currentState.name)
-    
-    if "gamemode" in currentState.vars:
-        debugString = debugString + " |MODE: %s"%currentState.vars['gamemode']
+    if not currentState == None:
+        debugString = "FPS: %i STATE: %s"%(fps, currentState.name)
         
-    if "Ship" in currentState.vars:
-        debugString = debugString + " |SHIP: %s"%currentState.vars['Ship']
-    
-    if "level" in currentState.vars:
-        debugString = debugString + " |LEVEL: %s"%currentState.vars['Level']
-    
+        if "gamemode" in currentState.vars:
+            debugString = debugString + " |MODE: %s"%currentState.vars['gamemode']
+            
+        if "Ship" in currentState.vars:
+            debugString = debugString + " |SHIP: %s"%currentState.vars['Ship']
+        
+        if "Level" in currentState.vars:
+            debugString = debugString + " |LEVEL: %s"%currentState.vars['Level']
+            
+        if not subState.name == None:
+            debugString = debugString + " |SUBSTATE: %s"%subState.name
+    else:
+        debugString = "FPS: %i |FADING"%fps
+        
     if fullscreen:
         debugString = debugString + " |FULLSCREEN"
     
-    surf.blit(font.render(debugString, False, color, (0,0,0)), pos)
-debugSurf = pygame.surface.Surface(screenRect.size)
-debugSurf.fill((0,255,0))
-debugSurf.set_colorkey((0,255,0))
+    textSurf = font.render(debugString, False, color, (0,0,0,150))
+    textSurf.set_alpha(150)
+    surf.blit(textSurf, pos)
+debugSurf = pygame.surface.Surface(screenRect.size, SRCALPHA)
+debugSurf.fill((0,0,0))
 try:
     debugFont = pygame.font.Font(os.path.join(folders['fonts'],config.get("Fonts",'debugfont')), 12)
 except IOError, e:
@@ -305,39 +326,13 @@ invincible = False
 if "-invincible" in sys.argv:
     invincible = True
     log.warning("Player is set to be invincible!")
-
-stressTest = False
-if "-stresstest" in sys.argv:
-    stressTest = True
-    debug = True
-    ch.setLevel(logging.DEBUG)
-    invincible = True
-    maxfps = 0
-    if "-binterval" in sys.argv:
-        STBulletInterval = int(sys.argv[sys.argv.index("-binterval")+1])
-    else:
-        STBulletInterval = 100
-    if "-einterval" in sys.argv:
-        STEnemyInterval = int(sys.argv[sys.argv.index("-einterval")+1])
-    else:
-        STEnemyInterval = 100
-    log.warning("Running a stress test. BInt: %i EInt: %i"%(STBulletInterval, STEnemyInterval))
     
-#TODO Make the BGs added by levels.
-F_BG = pygame.surface.Surface(((screenRect.width*2)*2, screenRect.height), SRCALPHA)
-M_BG = pygame.surface.Surface(((screenRect.width*3)*2, screenRect.height), SRCALPHA)
-B_BG = pygame.surface.Surface(((screenRect.width*4)*2, screenRect.height), SRCALPHA)
-BGs = [F_BG, M_BG, B_BG]
-
-mult = 1
-for BG in BGs:
-    BG.set_colorkey((0,0,0))
-    for i in range(0, 500*mult):
-        BG.set_at((random.randint(0, BG.get_rect().width), random.randint(0, BG.get_rect().height)), (255,255,255))
-    mult += 1
-    
-x_offset = 0
-#TODO
+if "-story-enable" in sys.argv:
+    storyEnabled = True
+    log.info("Story mode enabled")
+else:
+    storyEnabled = False
+    log.info("Story mode is disabled in this version.")
 
 # Initialize menus
 log.debug("Initializing menus")
@@ -349,139 +344,259 @@ except IOError, e:
     sys.exit()
 
 menuSurf = pygame.surface.Surface(screen.get_rect().size, HWSURFACE)
-menuSurf.set_colorkey((0,0,0))
+menuSurf.set_colorkey((0,0,255))
+menuSurf.fill((0,0,255))
 menuSurf.set_alpha(255)
+menuList = []
 # Main menu first
 menu = menus.Menu(screenRect, textInfo={
     "Main":{
         "Text":"For The New Lunar Republic",
         "Color":(255,255,255),
-        "Loc":(screenRect.centerx,screenRect.top+50),
+        "Loc":(screenRect.width/2,50),
         "Font":mainHeaderFont
         },
     "Sub":{
         "Text":"Version %s by %s"%(__version__, __author__),
         "Color":(255,255,255),
-        "Loc":(screenRect.centerx,screenRect.top+100),
+        "Loc":(screenRect.width/2,100),
         "Font":pygame.font.Font(os.path.join(folders['fonts'],"VGAFIX.FON"), 8)
         }
     },
-    bgImage=pygame.image.load(os.path.join(folders['images'], "MenuBGNewLegal.png")).convert(),
+    # bgImage=pygame.image.load(os.path.join(folders['images'], "MenuBGNewLegal720p.png")).convert(),
+    bgImage=pygame.image.load(os.path.join(folders['images'], config.get("Display", 'menubgimage'))).convert(),
     allowKeys=False)
 
-menu.makeNewButton("Play", "Play", (screenRect.centerx, screenRect.centery-30))
-menu.makeNewButton("Settings", "Settings", (screenRect.centerx, screenRect.centery+10))
-menu.makeNewButton("Exit", "Exit", (screenRect.centerx, screenRect.centery+50))
+menu.makeNewButton("Story", "Story", (screenRect.width/2-75, screenRect.height/2-30))
+menu.makeNewButton("Arcade", "Arcade", (screenRect.width/2+75, screenRect.height/2-30))
+# menu.makeNewButton("Play", "Play", (screenRect.width/2, screenRect.height/2-30))
+menu.makeNewButton("Settings", "Settings", (screenRect.width/2, screenRect.height/2+10))
+menu.makeNewButton("Exit", "Exit", (screenRect.width/2, screenRect.height/2+50))
 log.debug("Main Menu initialized")
+menuList.append(menu)
 
 # Pause menu next
 pauseMenu = menus.Menu(screenRect, textInfo={
     "Main":{
         "Text":"Paused",
         "Color":(255,255,255),
-        "Loc":(screenRect.centerx, screenRect.top+50),
+        "Loc":(screenRect.width/2, 50),
         "Font":mainHeaderFont
         }
     },
     bgImage=screen.copy(),
     allowKeys=False)
 
-pauseMenu.makeNewButton("Resume", "Resume", (screenRect.centerx, screenRect.centery-30))
-pauseMenu.makeNewButton("Settings", "Settings", (screenRect.centerx, screenRect.centery+10))
-pauseMenu.makeNewButton("MainMenu", "MainMenu", (screenRect.centerx, screenRect.centery+50))
+pauseMenu.makeNewButton("Resume", "Resume", (screenRect.width/2, screenRect.height/2-30))
+pauseMenu.makeNewButton("Settings", "Settings", (screenRect.width/2, screenRect.height/2+10))
+pauseMenu.makeNewButton("MainMenu", "MainMenu", (screenRect.width/2, screenRect.height/2+50))
 log.debug("Pause Menu initialized")
-
-# Game mode menu next
-gameModeMenu = menus.Menu(screenRect, textInfo={
-    "Main":{
-        "Text":"Choose a game mode",
-        "Color":(255,255,255),
-        "Loc":(screenRect.centerx, screenRect.top+50),
-        "Font":mainHeaderFont
-        }
-    },
-    bgImage=menu.bgImage,
-    allowKeys=False)
-
-gameModeMenu.makeNewButton("Story", "Story", (screenRect.centerx-75, screenRect.centery-10))
-gameModeMenu.makeNewButton("Arcade", "Arcade", (screenRect.centerx+75, screenRect.centery-10))
-gameModeMenu.makeNewButton("Back", "Back", (screenRect.centerx, screenRect.centery+50))
-log.debug("Game Mode Select Menu initialized")
+menuList.append(pauseMenu)
 
 # Settings Menu
 settingsMenu = menus.Menu(screenRect, textInfo={
     "Main":{
         "Text":"Settings",
         "Color":(255,255,255),
-        "Loc":(screenRect.centerx, screenRect.top+50),
+        "Loc":(screenRect.width/2, 50),
         "Font":mainHeaderFont
         }
     },
     bgImage=menu.bgImage,
     allowKeys=False)
 
-settingsMenu.makeNewButton("Back", "Back", (screenRect.centerx, screenRect.bottom-30))
-settingsMenu.makeNewCheckButton("Fullscreen", "Fullscreen", (screenRect.centerx, screenRect.centery-40), fullscreen)
-settingsMenu.makeNewCheckButton("Sound", "Sound", (screenRect.centerx, screenRect.centery), sound)
+settingsMenu.makeNewButton("Back", "Back", (screenRect.width/2, screenRect.height/2+100))
+settingsMenu.makeNewCheckButton("Fullscreen", "Fullscreen", (screenRect.width/2, screenRect.height/2-40), fullscreen)
+settingsMenu.makeNewCheckButton("Sound", "Sound", (screenRect.width/2, screenRect.height/2), sound)
+settingsMenu.makeNewCheckButton("ManualFiring", "ManualFiring", (screenRect.width/2, screenRect.height/2+40), config.getboolean("Controls","manualfiring"))
 log.debug("Settings Menu initialized")
+menuList.append(settingsMenu)
+
+# The arcade settings menu next
+arcadeSettingsMenu = menus.Menu(screenRect, textInfo={
+    "Main":{
+        "Text":"Arcade Mode",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2, 50),
+        "Font":mainHeaderFont
+        },
+    "Ship":{
+        "Text":"CHARACTER",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2-100,125),
+        "Font":pygame.font.Font(os.path.join(folders['fonts'],"VGAFIX.FON"), 8)
+        },
+    "Level":{
+        "Text":"LEVEL",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2+100,125),
+        "Font":pygame.font.Font(os.path.join(folders['fonts'],"VGAFIX.FON"), 8)
+        },
+    "Sub":{
+        "Text":"Choose your Character and Level",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2,100),
+        "Font":pygame.font.Font(os.path.join(folders['fonts'],"VGAFIX.FON"), 8)
+        }
+    },
+    bgImage=menu.bgImage,
+    allowKeys=False)
+shipNameFont = pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.ttf"), 10)
+levelNameFont = pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.ttf"), 10)
+arcadeSettingsMenu.makeNewCharSelectButton(ships.shipTypes["RainbowDash"], (75,47), "ShipSelectMenuButton", "Button", (screenRect.width/2-100, screenRect.height/2), shipNameFont, 1, False)
+initialLevel = levels.arcadeLevels[0]
+arcadeSettingsMenu.makeNewLevelSelectButton(initialLevel, "LevelSelectMenuButton", (75,47), "Button", (screenRect.width/2+100, screenRect.height/2), levelNameFont, 1, False)
+arcadeSettingsMenu.makeNewButton("Back", "Back", (screenRect.width/2-100, screenRect.height-75), 1)
+arcadeSettingsMenu.makeNewButton("Play", "Play", (screenRect.width/2+100, screenRect.height-75), 1)
+menuList.append(arcadeSettingsMenu)
 
 # Character select menu next
 charSelectMenu = menus.Menu(screenRect, textInfo={
     "Main":{
         "Text":"Choose a Character",
         "Color":(255,255,255),
-        "Loc":(screenRect.centerx, screenRect.top+50),
+        "Loc":(screenRect.width/2, 50),
         "Font":mainHeaderFont
         }
     },
     bgImage=menu.bgImage,
     allowKeys=False)
 
-charSelectMenu.makeNewButton("SelectChar", "SelectChar", (screenRect.centerx, screenRect.bottom-80), 1)
-charSelectMenu.buttons[0].hidden = True
-charSelectMenu.makeNewButton("CharSelectBack", "CharSelectBack", (screenRect.centerx, screenRect.bottom-30), 1) #TODO change to back instead of charselectback
+charSelectMenu.makeNewButton("CharSelectBack", "CharSelectBack", (screenRect.width/2, screenRect.height-30), 1) #TODO change to back instead of charselectback
 xMult = 0
-shipNameFont = pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.ttf"), 10)
 for ship in ships.shipTypes.iterkeys():
-    charSelectMenu.makeNewCharSelectButton(ships.shipTypes[ship], (75,47), ship, "Button", pos=(screenRect.left+25+(160*xMult), screenRect.centery-100), shipNameFont=shipNameFont, posOrientation=0)
+    charSelectMenu.makeNewCharSelectButton(ships.shipTypes[ship], (75,47), ship, "Button", pos=(75+(150*xMult), screenRect.height/2-25), shipNameFont=shipNameFont, posOrientation=0)
     xMult += 1
 log.debug("Character Select Menu initialized")
+menuList.append(charSelectMenu)
 
 # Level select menu next
 levelSelectMenu = menus.Menu(screenRect, textInfo={
     "Main":{
         "Text":"Choose a Level",
         "Color":(255,255,255),
-        "Loc":(screenRect.centerx, screenRect.top+50),
+        "Loc":(screenRect.width/2, 50),
         "Font":mainHeaderFont
         }
     },
     bgImage=menu.bgImage,
     allowKeys=False)
 
-levelSelectMenu.makeNewButton("SelectLevel", "SelectLevel", (screenRect.centerx, screenRect.bottom-80), 1)
-levelSelectMenu.buttons[0].hidden = True
-levelSelectMenu.makeNewButton("Back", "Back", (screenRect.centerx, screenRect.bottom-30), 1)
+levelSelectMenu.makeNewButton("Back", "Back", (screenRect.width/2, screenRect.height-30), 1)
 xMult = 0
-levelNameFont = pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.ttf"), 10)
 for level in levels.arcadeLevels:
-    levelSelectMenu.makeNewLevelSelectButton(level, level.name, (75,47), "Button", pos=(screenRect.left+25+(160*xMult), screenRect.centery-100), levelNameFont=levelNameFont, posOrientation=0)
+    levelSelectMenu.makeNewLevelSelectButton(level, level.name, (75,47), "Button", pos=(75+(150*xMult), screenRect.height/2-25), levelNameFont=levelNameFont, posOrientation=0)
     xMult += 1
-log.debug("Character Select Menu initialized")
+log.debug("Level Select Menu initialized")
+menuList.append(levelSelectMenu)
+
+# Story menu for selecting things like new game, save game, etc.
+storyMenu = menus.Menu(screenRect, textInfo={ #TODO Maybe remove this from this screen.
+    "Main":{
+        "Text":"Story Mode",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2, -150),
+        "Font":mainHeaderFont
+        }
+    },
+    bgImage=menu.bgImage,
+    allowKeys=False)
+
+storyMenu.makeNewButton("New Game", "New Game", (screenRect.width/2, screenRect.height/2-30))
+storyMenu.makeNewButton("Back", "Back", (screenRect.width/2, screenRect.height/2+10))
+menuList.append(storyMenu)
+
+# Game Over Menu
+gameOverMenu = menus.Menu(screenRect, textInfo={
+    "Main":{
+        "Text":"GAME OVER",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2, 150),
+        "Font":mainHeaderFont
+        }
+    },
+    bgImage=menu.bgImage,
+    allowKeys=False)
+#TODO Flesh this out.
+gameOverMenu.makeNewButton("Back", "Back", (screenRect.width/2, screenRect.height/2+25))
+menuList.append(gameOverMenu)
+
+errorMessageMenu = menus.Menu(screenRect, textInfo={
+    "Main":{
+        "Text":"ERROR",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2, screenRect.height/2-150),
+        "Font":mainHeaderFont
+        },
+    "Sub":{
+        "Text":"An Error Occurred",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2,screenRect.height/2-50),
+        "Font":pygame.font.Font(os.path.join(folders['fonts'],"VGAFIX.FON"), 8)
+        },
+    "Message":{
+        "Text":"Unknown error",
+        "Color":(255,255,255),
+        "Loc":(screenRect.width/2,screenRect.height/2-35),
+        "Font":pygame.font.Font(os.path.join(folders['fonts'],"VGAFIX.FON"), 8)
+        }
+    },
+    bgImage=menu.bgImage,
+    allowKeys=False)
+
+errorMessageMenu.makeNewButton("Back", "Back", (screenRect.width/2, screenRect.height/2))
+errorMessageMenu.buttons[0].hidden = True
+errorMessageMenu.makeNewButton("MainMenu", "MainMenu", (screenRect.width/2, screenRect.height/2+40))
+errorMessageMenu.buttons[1].hidden = True
+errorMessageMenu.makeNewButton("Exit", "Exit", (screenRect.width/2, screenRect.height/2+80))
+errorMessageMenu.buttons[2].hidden = True
+menuList.append(errorMessageMenu)
 # End initialize menus
 
 # State initialization code
 log.debug("Initializing states")
-gameState = states.State("Game", {"level":"TestLevel", "gamemode":"Arcade"})
+gameState = states.State("Game", {"Level":"Test Level", "Ship":"RainbowDash", "gamemode":"Arcade"})
+cutsceneState = states.State("Cutscene", {"cutsceneName":"OpeningCutscene"})
 mainMenuState = states.State("MainMenu")
-gameModeSelectState = states.State("GameModeSelect")
+arcadeSettingsState = states.State("ArcadeSettings")
 charSelectState = states.State("CharSelect")
 levelSelectState = states.State("LevelSelect")
+storyMenuState = states.State("StoryMenu")
 settingsState = states.State("Settings")
 pauseState = states.State("PauseMenu", {"bgSurf":pygame.surface.Surface(screenRect.size)})
+gameOverState = states.State("GameOver", {"score":0})
+errorMessageState = states.State("ErrorMessage", {"Message":"Unknown Error", "lastState":None, "lastStateIsMenu":True, "errorLevel":0}) # errorLevel determines what buttons to show.
 
 currentState = mainMenuState
-# End state initialization code  
+
+subState = states.SubState()
+if "-instant-arcade" in sys.argv:
+    currentState = gameState
+    subState.name = "level"
+# End state initialization code
+
+# Initialize the story objects
+story = story.Story("Alpha Testing", pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.TTF"), 12), screenRect, config.getint("Sounds", 'musicvolume')/100., pygame.font.Font(os.path.join("fonts","pf_tempesta_seven.ttf"), 10), sound)
+# End story initialization
+
+
+
+# TODO PLACEHOLDER
+
+
+shipHub = shipHubModule.ShipHub(screenRect)
+
+
+# TODO PLACEHOLDER
+
+
+
+controls = {"upkey":config.getint("Controls",'upkey'),
+"downkey":config.getint("Controls",'downkey'),
+"rightkey":config.getint("Controls",'rightkey'),
+"leftkey":config.getint("Controls",'leftkey'),
+"fire":config.getint("Controls",'firekey')
+}
 
 currentSong = "Luna Deos"
     
@@ -504,8 +619,11 @@ def fadeFromBlack(origSurf):
         curTime -= clock.tick(maxfps)
         alpha = (curTime*1./fadeInTime*1.*100)*255/100 # Convert the percent of time passed to the 255 scale
         fadeSurf.set_alpha(alpha)
-        screen.blit(fadeSurf, (0,0))
-        pygame.display.update()
+        screen.blit(fadeSurf, screenRect.topleft)
+        blitDebugInfo(fps, None, None, fullscreen, debugSurf, debugFont, maxfps)
+        if debug:
+            screen.blit(debugSurf, screenRect.topleft)
+        pygame.display.update(screenRect)
 
 def fadeToBlack(origSurf):
     alpha = 0
@@ -516,32 +634,45 @@ def fadeToBlack(origSurf):
         curTime += clock.tick(maxfps)
         alpha = (curTime*1./fadeTime*1.*100)*255/100 # Convert the percent of time passed to the 255 scale
         fadeSurf.set_alpha(alpha)
-        screen.blit(fadeSurf, (0,0))
-        pygame.display.update()
+        screen.blit(fadeSurf, screenRect.topleft)
+        blitDebugInfo(fps, None, None, fullscreen, debugSurf, debugFont, maxfps)
+        if debug:
+            screen.blit(debugSurf, screenRect.topleft)
+        pygame.display.update(screenRect)
 
 def fadeOutMenu(origSurf):
     alpha = 255
     curTime = fadeTime
+    origSurfRect = origSurf.get_rect()
+    origSurfRect.center = screenRect.center
     while curTime > 0:
         pygame.event.pump()
-        screen.blit(origSurf, screenRect.topleft)
+        screen.blit(origSurf, origSurfRect.topleft)
         curTime -= clock.tick(maxfps)
         alpha = (curTime*1./fadeTime*1.*100)*255/100 # Convert the percent of time passed to the 255 scale
         menuSurf.set_alpha(alpha)
         screen.blit(menuSurf, (0,0))
-        pygame.display.update()
+        blitDebugInfo(fps, None, None, fullscreen, debugSurf, debugFont, maxfps)
+        if debug:
+            screen.blit(debugSurf, screenRect.topleft)
+        pygame.display.update(screenRect)
         
 def fadeInMenu(origSurf):
     alpha = 0
     curTime = 0
+    origSurfRect = origSurf.get_rect()
+    origSurfRect.center = screenRect.center
     while curTime < fadeInTime:
         pygame.event.pump()
-        screen.blit(origSurf, screenRect.topleft)
+        screen.blit(origSurf, origSurfRect.topleft)
         curTime += clock.tick(maxfps)
         alpha = (curTime*1./fadeInTime*1.*100)*255/100 # Convert the percent of time passed to the 255 scale
         menuSurf.set_alpha(alpha)
         screen.blit(menuSurf, (0,0))
-        pygame.display.update()
+        blitDebugInfo(fps, None, None, fullscreen, debugSurf, debugFont, maxfps)
+        if debug:
+            screen.blit(debugSurf, screenRect.topleft)
+        pygame.display.update(screenRect)
     
 done = False
 
@@ -549,17 +680,21 @@ runtime = 0
 
 reInitGame = True # This is to determine if the game needs to be reset once returning from something like the settings menu or the main menu even.
 
+pygame.mouse.set_visible(False)
+
 bm = pygame.time.Clock()
+log.info("Starting mainloop.")
 while not done:
     time = clock.tick(maxfps)
     runtime += time
     fps = clock.get_fps()
-    # if fps < maxfps/2:
-        # if fps > 0:
-            # log.warning("FPS has dipped below 1/2 of the maximum. Possibly due to the window being moved. (%i/%i)"%(fps,maxfps))
+    if fps < maxfps/2:
+        if fps > 0:
+            log.info("FPS has dipped below 1/2 of the maximum. Possibly due to the window being moved. (%i/%i)"%(fps,maxfps))
     screen.fill(fillColor)
     
     mouseEvents = []
+    keyEvents = []
     
     for e in pygame.event.get():
         if e.type == QUIT:
@@ -568,8 +703,10 @@ while not done:
             done = True
             
         elif e.type == KEYDOWN:
+            keyEvents.append(e)
             pressedKeys.append(e.key)
         elif e.type == KEYUP:
+            keyEvents.append(e)
             if e.key in pressedKeys:
                 pressedKeys.remove(e.key)
                 
@@ -579,7 +716,7 @@ while not done:
         elif e.type == ACTIVEEVENT:
             if e.state == 2:
                 log.debug("Lost focus")
-                if currentState == gameState:
+                if currentState == gameState and subState.name == "level":
                     currentState = pauseState
                     log.info("STATE CHANGE: %s"%currentState.name)
             
@@ -587,56 +724,134 @@ while not done:
                         pygame.mixer.music.pause()
             elif e.state == 6:
                 log.debug("Gained focus")
-                
     
-    
-    if currentState == gameState:
+    if currentState is gameState:
         # Figure out if the game was just faded into and if so, fade into the game.
         if fadeSurf.get_alpha() > 0:
             fadeFromBlack(screen.copy())
-            if reInitGame:
-                log.debug("Initializing game state")
+            if subState.name == "level":
+                if reInitGame:
+                    log.debug("Initializing game state")
+                    
+                    if currentState.vars["gamemode"] == "Arcade":
+                        level = levels.ArcadeLevel(currentState.vars["Level"])
+                    elif currentState.vars["gamemode"] == "Story":
+                        level = levels.StoryLevel(currentState.vars["Level"])
+                    center = (75,screenRect.centery)
+                    boundingRect = Rect(screenRect.left,screenRect.top, screenRect.width,screenRect.height-20)
+                    ship = ships.shipTypes[currentState.vars['Ship']](center, boundingRect, level, controls, config.getboolean("Controls", 'manualfiring'), [], invincible)                
+                    level.load(boundingRect, ship, folders, pygame.font.Font(os.path.join(folders['fonts'],"BEBAS.TTF"), 48))
+                    
+                    hudFonts = {
+                        'hp':pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.TTF"), 8),
+                        'bosshp':pygame.font.Font(os.path.join(folders['fonts'],"pf_tempesta_seven.TTF"), 14)
+                    }
+                    
+                    hudRect = Rect(0,screenRect.height-20, screenRect.width,20)
+                    levelhud = hud.HUD(hudRect, screenRect, level, hudFonts)
+                    levelhud.load()
+                    pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
+                    if sound:
+                        pygame.mixer.music.play(-1)
+                else:
+                    level = None
+            # elif subState.name == "cutscene":
+                # pygame.mouse.set_visible(False)
+                # fadeFromBlack(screen.copy())
                 
-                #TODO Building level code. Other code in this block is temporary.
-                if currentState.vars["gamemode"] == "Arcade":
-                    level = levels.ArcadeLevel(currentState.vars["Level"])
-                elif currentState.vars["gamemode"] == "Story":
-                    level = levels.StoryLevel(currentState.vars["Level"])
-                
-                ship = ships.shipTypes[currentState.vars['Ship']](center=(75,screenRect.centery), bounds=screenRect, invincible=invincible)                
-                level.load(screenRect, ship, folders)
-                pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
-                if sound:
-                    pygame.mixer.music.play(-1)
-                #TODO           
+                # cutscene = cutscenes.Cutscene(story, currentState.vars["cutsceneName"], config.getint("Sounds", 'musicvolume')/100., screenRect, pygame.font.Font(os.path.join("fonts","pf_tempesta_seven.ttf"), 10), sound)
+                # cutscene.load()
+                # log.info("Starting cutscene \"%s\"..."%currentState.vars["cutsceneName"])
         
-        level.update(pressedKeys, time)
-        level.draw(screen)
-        if level.done:
-            log.info("Level has ended. Returning to level select menu")
-            currentState = levelSelectState
-            log.info("STATE CHANGE: %s"%currentState.name)
-            fadeToBlack(screen.copy())
+        if gameState.vars['gamemode'] == "Story":
+            story.update(time, keyEvents, mouseEvents, subState, currentState, level)
+            story.draw(screen)
         
-        # if stressTest:
-            # log.debug("Bullets: %i|Enemies: %i|FPS: %i"%(len(enemyBulletGroup),len(enemyGroup),fps))
-        if level.gameOver:
-            log.info("Player 1 has died, returning to main menu")
-            currentState = mainMenuState
-            log.info("STATE CHANGE: %s"%currentState.name)
-            fadeToBlack(screen.copy())
-        
-        pauseState.vars['bgSurf'] = screen.copy()
-        
-        if K_ESCAPE in pressedKeys:
-            currentState = pauseState
-            log.info("STATE CHANGE: %s"%currentState.name)
-            currentState.vars['bgSurf'] = screen.copy()
-            pressedKeys.remove(K_ESCAPE)
+        if subState.name == "level":
+            pygame.mouse.set_visible(False)
+            level.update(pressedKeys, time)
+            level.draw(screen)
             
-            if sound:
-                pygame.mixer.music.pause()
-    elif currentState == mainMenuState:
+            levelhud.update(time)
+            levelhud.draw(screen)
+            
+            if level.done:
+                if gameState.vars['gamemode'] == "Arcade":
+                    currentState = arcadeSettingsState
+                else:
+                    currentState = mainMenuState
+                reInitGame = True
+                log.info("STATE CHANGE: %s"%currentState.name)
+                fadeToBlack(screen.copy())
+                pygame.mixer.stop()
+                # pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".wav"))
+                # pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
+                # if sound:
+                    # pygame.mixer.music.play(-1)
+                    
+            if level.gameOver:
+                log.info("Game Over.")
+                currentState = gameOverState
+                if gameState.vars['gamemode'] == "Arcade":
+                    currentState.vars['score'] = 9001
+                else:
+                    currentState.vars['score'] = None
+                log.info("STATE CHANGE: %s"%currentState.name)
+                fadeToBlack(screen.copy())
+                
+            if K_ESCAPE in pressedKeys:
+                currentState = pauseState
+                log.info("STATE CHANGE: %s"%currentState.name)
+                currentState.vars['bgSurf'] = screen.copy()
+                pressedKeys.remove(K_ESCAPE)
+                
+                if sound:
+                    pygame.mixer.music.pause()
+        
+        elif subState.name == "ship":
+            pygame.mouse.set_visible(True)
+            
+            shipHub.update(time, keyEvents, mouseEvents)
+            shipHub.draw(screen)
+        
+        elif subState.name == "dialog":
+            pygame.mouse.set_visible(False)
+            if story.needsToFade:
+                fadeToBlack(screen.copy())
+                story.needsToFade = False
+                subState.name = "ship"
+            
+        
+        # if gameState.vars['gamemode'] == "Story":
+            # story.draw(screen)
+        elif subState.name == "cutscene":
+            pygame.mouse.set_visible(False)
+            if story.needsToFade:
+                fadeToBlack(screen.copy())
+                story.needsToFade = False
+            # cutscene.update(time, keyEvents)
+            # cutscene.draw(screen)
+            
+            # if cutscene.done:
+                # fadeToBlack(screen.copy())
+    # elif currentState is cutsceneState:
+        
+    elif currentState is gameOverState:
+        gameOverMenu.update(pressedKeys, mouseEvents, time)
+        gameOverMenu.draw(screen)
+        
+        if fadeSurf.get_alpha() > 0:
+            fadeFromBlack(screen.copy())
+            pygame.mouse.set_visible(True)
+            pygame.mixer.music.stop()
+            
+        if gameOverMenu.pressedButton == "Back":
+            currentState = mainMenuState #TODO make this more flexible
+            log.info("STATE CHANGE: %s"%currentState.name)
+            gameOverMenu.draw(menuSurf)
+            fadeOutMenu(gameOverMenu.bgImage)
+            gameOverMenu.reinit()
+    elif currentState is mainMenuState:
         menu.update(pressedKeys, mouseEvents, time)
         menu.draw(screen)
             
@@ -645,19 +860,43 @@ while not done:
             menu.draw(menuSurf)
             fadeInMenu(menu.bgImage)
         if fadeSurf.get_alpha() > 0:
-            pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".wav"))
+            pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".mp3"))
             pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
             if sound:
                 pygame.mixer.music.play(-1)
             fadeFromBlack(screen.copy())
+            pygame.mouse.set_visible(True)
                 
-        if menu.pressedButton == "Play":
+        if menu.pressedButton == "Arcade":
+            log.debug("Arcade button pushed")
             menu.draw(menuSurf)
             fadeOutMenu(menu.bgImage)
-            currentState = gameModeSelectState
+            # currentState = charSelectState
+            currentState = arcadeSettingsState
             log.info("STATE CHANGE: %s"%currentState.name)
+            currentState.vars["gamemode"] = "Arcade"
             
             menu.reinit()
+        elif menu.pressedButton == "Story":
+            log.debug("Story button pushed")
+            if not storyEnabled:
+                log.warning("Story not implemented.")
+                menu.draw(menuSurf)
+                fadeOutMenu(menu.bgImage)
+                # fadeInMenu(gameModeMenu.bgImage)
+                currentState = errorMessageState
+                currentState.vars['Message'] = "Story mode not implemented yet. Sorry!"
+                currentState.vars['errorLevel'] = 0
+                currentState.vars['lastState'] = mainMenuState
+                currentState.vars['lastStateIsMenu'] = True
+                menu.reinit()
+            else:
+                log.warning("Beginning story mode. From now on the game WILL be buggy and glitchy.")
+                menu.draw(menuSurf)
+                fadeOutMenu(menu.bgImage)
+                currentState = storyMenuState
+                log.info("STATE CHANGE: %s"%currentState.name)
+                menu.reinit()
         elif menu.pressedButton == "Exit":
             pygame.mixer.music.fadeout(fadeTime)
             fadeToBlack(screen.copy())
@@ -671,10 +910,10 @@ while not done:
             log.info("STATE CHANGE: %s"%currentState.name)
             menu.reinit()
             currentState.vars['lastState'] = mainMenuState
-    elif currentState == settingsState:
+    elif currentState is settingsState:
         settingsMenu.update(pressedKeys, mouseEvents, time)
         settingsMenu.draw(screen)
-            
+        
         # Figure out if the menu was just faded into and if so, fade into the menu.
         if menuSurf.get_alpha() < 255:
             settingsMenu.draw(menuSurf)
@@ -686,16 +925,28 @@ while not done:
         if "Fullscreen" in settingsMenu.checkedButtons:
             if not fullscreen:
                 setFullscreenMode(config.getboolean("Display", 'fullscaling'))
+                for m in menuList:
+                    m.resetRects(screenRect)
                 config.set("Display", "fullscreen", "1")
                 changedSettings = True
                 fullscreen = True
+                menuSurf = pygame.surface.Surface(screen.get_rect().size, HWSURFACE)
+                menuSurf.set_colorkey((0,0,255))
+                menuSurf.fill((0,0,255))
+                menuSurf.set_alpha(255)
                 settingsMenu.reinit()
         else:
             if fullscreen:
                 setWindowedMode()
+                for m in menuList:
+                    m.resetRects(screenRect)
                 config.set("Display", "fullscreen", "0")
                 changedSettings = True
                 fullscreen = False
+                menuSurf = pygame.surface.Surface(screen.get_rect().size, HWSURFACE)
+                menuSurf.set_colorkey((0,0,255))
+                menuSurf.fill((0,0,255))
+                menuSurf.set_alpha(255)
                 settingsMenu.reinit()
         
         if "Sound" in settingsMenu.checkedButtons:
@@ -710,6 +961,20 @@ while not done:
                 changedSettings = True
                 pygame.mixer.music.fadeout(fadeTime)
                 config.set("Sounds", 'nosound', "1")
+                
+        if "ManualFiring" in settingsMenu.checkedButtons:
+            if not config.getboolean("Controls", 'manualfiring'):
+                config.set("Controls", 'manualfiring', "1")
+                changedSettings = True
+                if currentState.vars['lastState'] == pauseState: # If we're going to return to the game after this.
+                    level.ship.manualFiring = True
+        else:
+            if config.getboolean("Controls", 'manualfiring'):
+                config.set("Controls", 'manualfiring', "0")
+                changedSettings = True
+                if currentState.vars['lastState'] == pauseState: # If we're going to return to the game after this.
+                    level.ship.manualFiring = False
+                
         
         
         if settingsMenu.pressedButton == "Back":
@@ -723,104 +988,150 @@ while not done:
                 reInitGame = False
             else:
                 fadeOutMenu(settingsMenu.bgImage)
-            settingsMenu.reinit()   
-    elif currentState == gameModeSelectState:
-        gameModeMenu.update(pressedKeys, mouseEvents, time)
-        gameModeMenu.draw(screen)
+            settingsMenu.reinit()
+    elif currentState is storyMenuState:
+        storyMenu.update(pressedKeys, mouseEvents, time)
+        storyMenu.draw(screen)
         
-        # Figure out if the game was just faded into and if so, fade into the menu.
         if menuSurf.get_alpha() < 255:
-            gameModeMenu.draw(menuSurf)
-            fadeInMenu(gameModeMenu.bgImage)
+            storyMenu.draw(menuSurf)
+            fadeInMenu(storyMenu.bgImage)
+        if fadeSurf.get_alpha() > 0:
+            currentSong = "Luna Deos"
+            if fadeSurf.get_alpha() > 0:
+                pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".mp3"))
+                pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
+                if sound:
+                    pygame.mixer.music.play(-1)
+                fadeFromBlack(screen.copy())
+            pygame.mouse.set_visible(True)
                 
-        if gameModeMenu.pressedButton == "Arcade":
-            log.debug("Arcade button pushed")
-            gameModeMenu.draw(menuSurf)
-            fadeOutMenu(gameModeMenu.bgImage)
-            currentState = charSelectState
-            log.info("STATE CHANGE: %s"%currentState.name)
-            currentState.vars["gamemode"] = "Arcade"
-            
-            gameModeMenu.reinit()
-        elif gameModeMenu.pressedButton == "Story":
-            log.debug("Story button pushed")
-            log.warning("Story not implemented.")
-            gameModeMenu.draw(menuSurf)
-            fadeOutMenu(gameModeMenu.bgImage)
-            fadeInMenu(gameModeMenu.bgImage)
-            gameModeMenu.reinit()
-        elif gameModeMenu.pressedButton == "Back":
+        if storyMenu.pressedButton == "Back":
             currentState = mainMenuState
             log.info("STATE CHANGE: %s"%currentState.name)
-            gameModeMenu.draw(menuSurf)
-            fadeOutMenu(gameModeMenu.bgImage)
-            gameModeMenu.reinit()        
-    elif currentState == charSelectState:
+            storyMenu.draw(menuSurf)
+            fadeOutMenu(storyMenu.bgImage)
+            storyMenu.reinit()
+        elif storyMenu.pressedButton == "New Game":
+            # currentState = cutsceneState
+            gameState.vars['gamemode'] = "Story"
+            currentState = gameState
+            log.info("STATE CHANGE: %s"%currentState.name)
+            storyMenu.draw(menuSurf)
+            fadeToBlack(screen.copy())
+            storyMenu.reinit()
+            currentState.vars["cutsceneName"] = "Opening Cutscene"
+            pygame.mixer.music.stop()
+            subState.name = "cutscene"
+    elif currentState is arcadeSettingsState:
+        arcadeSettingsMenu.update(pressedKeys, mouseEvents, time)
+        arcadeSettingsMenu.draw(screen)
+        
+        if "Ship" in currentState.vars.keys():
+            arcadeSettingsMenu.shipButtons[0].setShip(ships.shipTypes[currentState.vars["Ship"]])
+        else:
+            for shipType in ships.shipTypes.iteritems():
+                if type(arcadeSettingsMenu.shipButtons[0].ship) is shipType[1]:
+                    name = shipType[0]
+            currentState.vars["Ship"] = name
+        if "Level" in currentState.vars.keys():
+            for l in levels.arcadeLevels:
+                if l.name == currentState.vars["Level"]:
+                    arcadeSettingsMenu.levelButtons[0].setLevel(l)
+        else:
+            currentState.vars["Level"] = arcadeSettingsMenu.levelButtons[0].level.name
+            
+        if menuSurf.get_alpha() < 255:
+            arcadeSettingsMenu.draw(menuSurf)
+            fadeInMenu(arcadeSettingsMenu.bgImage)
+        if fadeSurf.get_alpha() > 0:
+            currentSong = "Luna Deos"
+            if fadeSurf.get_alpha() > 0:
+                pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".mp3"))
+                pygame.mixer.music.set_volume(config.getint("Sounds", 'musicvolume')/100.)
+                if sound:
+                    pygame.mixer.music.play(-1)
+                fadeFromBlack(screen.copy())
+            pygame.mouse.set_visible(True)
+        
+        if arcadeSettingsMenu.pressedButton == "SHIP_ShipSelectMenuButton":
+            arcadeSettingsMenu.draw(menuSurf)
+            fadeOutMenu(arcadeSettingsMenu.bgImage)
+            currentState = charSelectState
+            for shipType in ships.shipTypes.iteritems():
+                if type(arcadeSettingsMenu.shipButtons[0].ship) is shipType[1]:
+                    name = shipType[0]
+            currentState.vars["Ship"] = name
+            log.info("STATE CHANGE: %s"%currentState.name)
+            
+            arcadeSettingsMenu.reinit()
+        elif arcadeSettingsMenu.pressedButton == "LEVEL_LevelSelectMenuButton":
+            arcadeSettingsMenu.draw(menuSurf)
+            fadeOutMenu(arcadeSettingsMenu.bgImage)
+            currentState = levelSelectState
+            currentState.vars["Level"] = arcadeSettingsMenu.levelButtons[0].level.name
+            log.info("STATE CHANGE: %s"%currentState.name)
+            
+            arcadeSettingsMenu.reinit()
+        elif arcadeSettingsMenu.pressedButton == "Back":
+            currentState = mainMenuState
+            log.info("STATE CHANGE: %s"%currentState.name)
+            arcadeSettingsMenu.draw(menuSurf)
+            fadeOutMenu(arcadeSettingsMenu.bgImage)
+            arcadeSettingsMenu.reinit()
+        elif arcadeSettingsMenu.pressedButton == "Play":
+            currentState = gameState
+            log.info("STATE CHANGE: %s"%currentState.name)
+            currentState.vars["Ship"] = arcadeSettingsState.vars["Ship"]
+            currentState.vars["Level"] = arcadeSettingsState.vars["Level"]
+            subState.name = "level"
+            currentLevel = currentState.vars["Level"]
+            if sound:
+                pygame.mixer.music.stop()
+            fadeToBlack(screen.copy())
+            arcadeSettingsMenu.reinit()
+            reInitGame = True #TODO This might be moved later.
+    elif currentState is charSelectState:
         charSelectMenu.update(pressedKeys, mouseEvents, time)
         charSelectMenu.draw(screen)
         
-        if charSelectMenu.pressedShipButton != None:
-            charSelectMenu.buttons[0].hidden = False
-        
         # Figure out if the game was just faded into and if so, fade into the menu.
         if menuSurf.get_alpha() <= 0:
+            if "Ship" in currentState.vars.keys():
+                charSelectMenu.pressedShipButton = "SHIP_"+currentState.vars["Ship"]
+                
             charSelectMenu.draw(menuSurf)
             fadeInMenu(charSelectMenu.bgImage)
         
-        if charSelectMenu.pressedButton == "SelectChar":
-            if not charSelectMenu.pressedShipButton == None: # Make sure the user has actually selected a ship first
-                log.info("Player chose %s character"%charSelectMenu.pressedShipButton)
-                currentState.vars["Ship"] = charSelectMenu.pressedShipButton[5:]
-                currentState = levelSelectState
-                log.info("STATE CHANGE: %s"%currentState.name)
-                fadeOutMenu(charSelectMenu.bgImage)
-                charSelectMenu.reinit()
-            else:
-                charSelectMenu.reinit()
-                log.warning("No character selected. How did this happen? The button should not display until a character is selected.")
-        
-        elif charSelectMenu.pressedButton == "CharSelectBack":
-            currentState = gameModeSelectState
+        if charSelectMenu.pressedButton == "CharSelectBack":
+            currentState = arcadeSettingsState
+            currentState.vars["Ship"] = charSelectMenu.pressedShipButton[5:]
             log.info("STATE CHANGE: %s"%currentState.name)
             charSelectMenu.draw(menuSurf)
             fadeOutMenu(charSelectMenu.bgImage)
             charSelectMenu.reinit()
-    elif currentState == levelSelectState:
+    elif currentState is levelSelectState:
         levelSelectMenu.update(pressedKeys, mouseEvents, time)
         levelSelectMenu.draw(screen)
         
-        if levelSelectMenu.pressedLevelButton != None:
-            levelSelectMenu.buttons[0].hidden = False
-        
         # Figure out if the game was just faded into and if so, fade into the menu.
         if menuSurf.get_alpha() <= 0:
+            if "Level" in currentState.vars.keys():
+                levelSelectMenu.pressedLevelButton = "LEVEL_"+currentState.vars["Level"]
+                
             levelSelectMenu.draw(menuSurf)
             fadeInMenu(charSelectMenu.bgImage)
-        
-        if levelSelectMenu.pressedButton == "SelectLevel":
-            if not levelSelectMenu.pressedLevelButton == None:
-                log.info("Player chose level %s."%levelSelectMenu.pressedLevelButton)
-                currentState = gameState
-                log.info("STATE CHANGE: %s"%currentState.name)
-                currentState.vars["Ship"] = charSelectState.vars["Ship"]
-                currentState.vars["Level"] = levelSelectMenu.pressedLevelButton[6:]
-                currentLevel = currentState.vars["Level"]
-                if sound:
-                    pygame.mixer.music.stop()
-                fadeToBlack(screen.copy())
-                levelSelectMenu.reinit()
-                reInitGame = True #TODO This might be moved later.
-            else:
-                levelSelectMenu.reinit()
-                log.warning("No level selected. How did this happen? The button should not display until a level is selected.")
             
-        elif levelSelectMenu.pressedButton == "Back":
-            currentState = charSelectState
+        if levelSelectMenu.pressedButton == "Back":
+            log.info("Player chose level %s."%levelSelectMenu.pressedLevelButton)
+            currentState = arcadeSettingsState
+            currentState.vars["Level"] = levelSelectMenu.pressedLevelButton[6:]
             log.info("STATE CHANGE: %s"%currentState.name)
             levelSelectMenu.draw(menuSurf)
             fadeOutMenu(charSelectMenu.bgImage)
             levelSelectMenu.reinit()
-    elif currentState == pauseState:
+    elif currentState is pauseState:
+        pygame.mouse.set_visible(True)
         if fadeSurf.get_alpha() > 0:
             fadeFromBlack(screen.copy())
         pauseMenu.bgImage = pygame.surface.Surface(screenRect.size)
@@ -855,18 +1166,82 @@ while not done:
             
             if sound:
                 pygame.mixer.music.stop()
+    elif currentState is errorMessageState:
+        initMenu = False
+        if menuSurf.get_alpha() < 255 or fadeSurf.get_alpha() > 0:
+            pygame.mouse.set_visible(True)
+            initMenu = True
+            
+        if initMenu:
+            errorMessageMenu.textInfo["Message"]["Text"] = currentState.vars['Message']
+            errorLevel = currentState.vars["errorLevel"]
+            if errorLevel == 0:
+                for button in errorMessageMenu.buttons:
+                    button.hidden = False
+                errorMessageMenu.buttons[0].setPos((screenRect.centerx, screenRect.centery), 1)
+                errorMessageMenu.buttons[1].setPos((screenRect.centerx, screenRect.centery+40), 1)
+                errorMessageMenu.buttons[2].setPos((screenRect.centerx, screenRect.centery+80), 1)
+            elif errorLevel == 1:
+                errorMessageMenu.textInfo["Message"]["Text"] = "Serious Error: "+errorMessageMenu.textInfo["Message"]["Text"]
+                for button in errorMessageMenu.buttons[1:]:
+                    button.hidden = False
+                errorMessageMenu.buttons[1].setPos((screenRect.centerx, screenRect.centery), 1)
+                errorMessageMenu.buttons[2].setPos((screenRect.centerx, screenRect.centery+40), 1)
+            elif errorLevel == 2:
+                errorMessageMenu.textInfo["Message"]["Text"] = "CRITICAL ERROR: "+errorMessageMenu.textInfo["Message"]["Text"]
+                errorMessageMenu.buttons[2].hidden = False
+                errorMessageMenu.buttons[2].setPos((screenRect.centerx, screenRect.centery), 1)
+        
+        errorMessageMenu.update(pressedKeys, mouseEvents, time)
+        errorMessageMenu.draw(screen)        
+               
+        if menuSurf.get_alpha() < 255:
+            errorMessageMenu.draw(menuSurf)
+            fadeInMenu(errorMessageMenu.bgImage)
+            initMenu = True
+            
+        if fadeSurf.get_alpha() > 0:
+            fadeFromBlack(screen.copy())
+            initMenu = True
+        
+        if errorMessageMenu.pressedButton == "Back":
+            if currentState.vars['lastState'] != None:
+                if currentState.vars['lastStateIsMenu']:
+                    fadeOutMenu(errorMessageMenu.bgImage)
+                else:
+                    fadeToBlack(screen.copy())
+                currentState = currentState.vars['lastState']
+            errorMessageMenu.reinit()
+        elif errorMessageMenu.pressedButton == "Exit":
+            pygame.mixer.music.fadeout(fadeTime)
+            fadeToBlack(screen.copy())
+            runtime += clock.tick()
+            log.info("Quitting (Exit button from error screen). Run time: %f seconds."%(runtime/1000.))
+            done = True
+            errorMessageMenu.reinit()
+        elif errorMessageMenu.pressedButton == "MainMenu":
+            currentState = mainMenuState
+            log.info("STATE CHANGE: %s"%currentState.name)
+            errorMessageMenu.draw(menuSurf)
+            fadeOutMenu(errorMessageMenu.bgImage)
+            errorMessageMenu.reinit()
         
     else:
         log.warning("currentState is set to unhandled object (%s). Resetting to main menu state. The game may be unstable now."%currentState)
-        currentState = mainMenuState
+        
+        currentState = errorMessageState
+        currentState.vars['Message'] = "Unhandled state type. Most likely a typo or incomplete section of the game. Contact the programmer."
+        currentState.vars['errorLevel'] = 0
+        currentState.vars['lastState'] = mainMenuState
+        currentState.vars['lastStateIsMenu'] = True
     
-    
-    blitDebugInfo(fps, currentState, fullscreen, debugSurf, debugFont, maxfps)
+    blitDebugInfo(fps, currentState, subState, fullscreen, debugSurf, debugFont, maxfps)
     if debug:
         screen.blit(debugSurf, screenRect.topleft)
     
-    pygame.display.update()
+    pygame.display.update(screenRect)
 
 log.debug("Ending logging cleanly.")
 logging.shutdown()
 fh.close() # Close the log file.
+sys.exit()

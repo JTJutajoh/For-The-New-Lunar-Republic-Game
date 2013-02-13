@@ -33,3 +33,11 @@ class State(object):
         
     def __str__(self):
         return "State: %s"%self.name
+        
+class SubState(object):
+    
+    def __init__(self, name=None):
+        self.name = name
+        
+    def __str__(self):
+        return "SubState: %s"%self.name

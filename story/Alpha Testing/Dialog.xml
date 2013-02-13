@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<sequences>
+    <dialog id="Opening">
+        <background>
+            <name>Blank</name>
+            <file>Blank.png</file>
+        </background>
+        <section>
+            <id>Section1</id>
+            <speaker>Mystery</speaker>
+            <bg>
+                <id>Blank</id>
+            </bg>
+            <content>
+                <line speed="0.5">...waking up...</line>
+                <line speed="0.5">...not ready...</line>
+                <line speed="0.5">...can't wait any longer...</line>
+                <line speed="0.5">...Don't be ridiculous!...</line>
+                <line speed="0.5">...If it's going to happen, it has to happen NOW...</line>
+                <line speed="0.5">...Okay, that's it, pull her out...</line>
+            </content>
+        </section>
+        <section>
+            <id>Section2</id>
+            <speaker>Luna</speaker>
+            <bg>
+                <id>Blank</id>
+            </bg>
+            <content>
+                <line>SKIPPING SOME STORY STUFFS</line>
+                <line>Let's take you to your ship...</line>
+            </content>
+        </section>
+    </dialog>
+    <dialog id="PlaceHolder">
+        <background>
+            <name>PaS</name>
+            <file>Planet and Sun.png</file>
+        </background>
+        <section>
+            <id>Section1</id>
+            <speaker>Mystery</speaker>
+            <bg>
+                <id>PaS</id>
+                <fadein>1000</fadein>
+            </bg>
+            <content>
+                <line>It's beautiful, isn't it?</line>
+            </content>
+        </section>
+        <section>
+            <id>Section2</id>
+            <speaker>Twilight Sparkle</speaker>
+            <bg>
+                <id>PaS</id>
+            </bg>
+            <content>
+                <mood>Normal</mood>
+                <line>It's...</line>
+                <line>It's incredible.</line>
+            </content>
+        </section>
+        <section>
+            <id>Section1</id>
+            <speaker>Mystery</speaker>
+            <bg>
+                <id>PaS</id>
+                <fadeout>1000</fadeout>
+            </bg>
+            <content>
+                <line>I know. It really is a sight to behold.</line>
+                <line>Come with me and we'll get started.</line>
+            </content>
+        </section>
+    </dialog>
+</sequences>

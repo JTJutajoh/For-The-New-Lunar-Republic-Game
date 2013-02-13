@@ -1,0 +1,8 @@
+1:75:AlphaEnemy
+3:100:DiamondDogRed
+1:300:AlphaEnemy
+3:350:DiamondDogRed
+1:650:AlphaEnemy
+3:700:DiamondDogRed
+1:900:AlphaEnemy
+3:950:DiamondDogRed

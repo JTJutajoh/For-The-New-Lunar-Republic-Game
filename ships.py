@@ -25,6 +25,7 @@ from pygame.locals import *
 
 from bullets import *
 import enemies
+import weapons
 
 class Ship(pygame.sprite.Sprite):
     """Base Ship class. This class is not to be instantiated directly.
@@ -49,22 +50,31 @@ class Ship(pygame.sprite.Sprite):
             fire        Not yet implemented. Will somehow cause the ship to fire its weapon. Called every time the self.fireCounter var
                             reaches the self.fireInterval variable, which is defined from the frate in the self.stats variable."""
 
-    def __init__(self, center, bounds, groups=[], invincible=False):
+    def __init__(self, center, bounds, parent, controls={}, manualFiring=False, groups=[], invincible=False):
+        self.obType = "Player"
         pygame.sprite.Sprite.__init__(self, groups)
         self.filePreFix = "RD"
-        self.normImgName = "Ship_Normal"
-        self.normImgAltName = "Ship_Normal_Alt"
         self.bulletImgFileName = "Bullet"
         self.explosionFileName = "ShipExplosion"
+        
+        self.parent = parent
+        
+        self.imageStates = 2
+        self.images = []
         
         self.bounds = bounds # A bounding rect for the ship to collide with. Usually the edges of the screen.
         
         # Shields: Health
         # Power:   Damage done by weapon
         # Frate:   Firing rate of weapon
-        self.stats = {"shields":20, "power":20, "frate":20}
+        self.stats = {"shields":20, "power":20, "frate":20, "rrate":40}
         self.bulletPowerMod = 0 # For powerups and such
         self.damageMod = 0 # For powerups and such (Damage recieved)
+        
+        self.manualFiring = manualFiring
+        self.firing = False
+        
+        self.controls = controls
         
         self.velocity = [0, 0]
         self.moveSpeed = 250. # Pixels per second
@@ -74,9 +84,13 @@ class Ship(pygame.sprite.Sprite):
         self.imageChangeInterval = 50.0 # In milliseconds
         self.imageState = 0 # Either 0 or 1. AKA True or False. This alternates between images for the animation. Possibly expandable to more than two images.
         
+        self.regenCounter = 0
+        
         self.fireCounter = 0 # In milliseconds. The fireInterval is calculated in self.calcStats based off of the frate stat.
         
         self.fireSource = 5,6 # Where on the image should the bullets originate from?
+        
+        self.lazerDamageCounter = -1 # A counter to make the player take a certain amount of damage per second.
         
         self.bulletType = RDBullet # Gets overruled by subclasses. This is just hear to make this class somewhat functional.
         self.bulletGroup = pygame.sprite.Group() # The update function handles this group's updating.
@@ -88,7 +102,13 @@ class Ship(pygame.sprite.Sprite):
         self.explosionTime = 1000 # milliseconds
         self.explosionAlpha = 200
         
+        self.weapons = [] # A list containing all the weapon objects on the ship currently. TODO Make this with slots for the upgrading stuff later
+        
         self.invincible = invincible # Defaults to False. This makes it so that health is not depleted when hit if True.
+        
+        self.calcStats()
+        
+        self.center = center
         
     
     def postInit(self, center):
@@ -96,27 +116,31 @@ class Ship(pygame.sprite.Sprite):
         self.loadImages(center)
         self.calcStats()
         
-    def loadImages(self, center):
+    def loadImages(self):
         # Load the first image of the ship's animation.
-        completeFileName = os.path.join("images", self.folderName, self.filePreFix+"_"+self.normImgName+".png")
-        self.normImg = pygame.image.load(completeFileName).convert()
-        self.normImg.set_colorkey((0,255,0))
-        # Load the second image of the ship's animation.
-        completeFileName = os.path.join("images", self.folderName, self.filePreFix+"_"+self.normImgAltName+".png")
-        self.normImgAlt = pygame.image.load(completeFileName).convert()
-        self.normImgAlt.set_colorkey((0,255,0))
+        for i in range(0,self.imageStates):
+            if type(self).vectorStyle:
+                completeFileName = os.path.join("images", type(self).folderName, type(self).filePreFix+str(i)+" VECTOR STYLE"+".png")
+                image = pygame.image.load(completeFileName).convert_alpha()
+            else:
+                completeFileName = os.path.join("images", type(self).folderName, type(self).filePreFix+str(i)+".png")
+                image = pygame.image.load(completeFileName).convert()
+                image.set_colorkey((0,255,0))
+            # image = image.subsurface(image.get_bounding_rect())
+            type(self).images.append(image)
         
         # Set the image as the first frame of the animation.
-        self.image = self.normImg
+        self.image = type(self).images[0]
         self.rect = self.image.get_rect()
-        self.rect.center = center # Center propogates from the __init__ function's arguments.
+        self.rect.center = self.center # Center propogates from the __init__ function's arguments.
         self.exactPos = [self.rect.left*1.,self.rect.top*1.] # Convert to decimals so that it runs exactly.
         
         completeFileName = os.path.join("images", self.explosionFileName+".png")
         self.explosionImage = pygame.image.load(completeFileName)
-        self.explosionRect = self.explosionImage.get_rect()
         self.explosionImage.set_colorkey((0,255,0))
         self.explosionImage.set_alpha(self.explosionAlpha)
+        self.explosionRect = self.explosionImage.get_rect()
+        self.explosionRect.center = self.rect.center
         
     def getImages(self):
         # This function is intended for the character select buttons to call.
@@ -124,46 +148,54 @@ class Ship(pygame.sprite.Sprite):
         # Because the game only creates one instance, and only after the player chooses which one to create.
         # There might be a better way to handle this, I'm open for suggestions.
         images = []
-        
-        completeImageName = os.path.join("images", self.folderName, self.filePreFix+"_"+self.normImgName+".png")
-        images.append(pygame.image.load(completeImageName).convert())
-        
-        completeImageName = os.path.join("images", self.folderName, self.filePreFix+"_"+self.normImgAltName+".png")
-        images.append(pygame.image.load(completeImageName).convert())
-        
-        for image in images:
-            image.set_colorkey((0,255,0))
+        for i in range(0,self.imageStates):
+            if type(self).vectorStyle:
+                completeFileName = os.path.join("images", type(self).folderName, type(self).filePreFix+str(i)+" VECTOR STYLE"+".png")
+                image = pygame.image.load(completeFileName).convert_alpha()
+            else:
+                completeFileName = os.path.join("images", type(self).folderName, type(self).filePreFix+str(i)+".png")
+                image = pygame.image.load(completeFileName).convert()
+                image.set_colorkey((0,255,0))
+            # image = image.subsurface(image.get_bounding_rect())
+            images.append(image)
         return images
         
     def calcStats(self):
-        self.fireInterval = 10000.0/self.stats['frate']
-        self.maxHealth = 5*self.stats['shields']
+        #TODO Work on balancing.
+        self.fireInterval = 10000.0/type(self).stats['frate']
+        self.maxHealth = 10*type(self).stats['shields']
         self.health = self.maxHealth
+        if type(self).stats['rrate'] == 0:
+            self.regenInterval = -1
+        else:
+            self.regenInterval = ((125-type(self).stats['rrate'])/2)*1000
+        self.regenAmount = 1. # Percent.
+        self.otherCollisionDamage = 5
     
-    def update(self, pressedKeys, time, bulletGroup=None):
+    def update(self, pressedKeys, time, bulletGroup=None, otherCollisions=[], lazers=[]):
         if self.alive:
             self.imageChangeCounter += time # For the animation
             self.fireCounter += time
+            self.regenCounter += time
             
             if self.imageChangeCounter >= self.imageChangeInterval:
                 self.switchImage()
             
-            #TODO Make the controls changeable.
             # The reason it's arranged the way it is is so that keys pressed will override the last pressed key. But when it's let up, the first key will kick back in.
             for key in pressedKeys:
-                if key == K_s:
+                if key == self.controls['downkey']:
                     self.velocity[1] = 1
-                elif key == K_w:
+                elif key == self.controls['upkey']:
                     self.velocity[1] = -1
                     
-                if key == K_a:
+                if key == self.controls['leftkey']:
                     self.velocity[0] = -1.5 # Make the ship move backwards slightly faster than in any other direction.
-                elif key == K_d:
+                elif key == self.controls['rightkey']:
                     self.velocity[0] = 1
                     
-            if not K_s in pressedKeys and not K_w in pressedKeys:
+            if not self.controls['downkey'] in pressedKeys and not self.controls['upkey'] in pressedKeys:
                 self.velocity[1] = 0
-            if not K_a in pressedKeys and not K_d in pressedKeys:
+            if not self.controls['leftkey'] in pressedKeys and not self.controls['rightkey'] in pressedKeys:
                 self.velocity[0] = 0
             
             distMovedThisFrame = self.moveSpeed*time/1000.
@@ -186,18 +218,54 @@ class Ship(pygame.sprite.Sprite):
             # Assign the rect to exactPos so that the group draws it in the right place.
             self.rect.topleft = (self.exactPos[0], self.exactPos[1])
             
+            # Check for manual firing.
+            if self.controls['fire'] in pressedKeys:
+                self.firing = True
+            else:
+                self.firing = False
+            
             # bulletGroup is the group that this ship collides with.
-            for bullet in bulletGroup:
-                if bullet.rect.colliderect(self.rect):
-                    bullet.kill()
+            collided = pygame.sprite.spritecollide(self, bulletGroup, True, pygame.sprite.collide_mask)
+            for bullet in collided:
+                if not self.invincible:
+                    self.health -= bullet.power
+                    
+            for other in otherCollisions:
+                if other.rect.colliderect(self.rect):
                     if not self.invincible:
-                        self.health -= bullet.power
+                        self.health -= self.otherCollisionDamage
+            lazerCollisions = False
+            for other in lazers:
+                if other[0].colliderect(self.rect):
+                    self.lazerDamageCounter += time
+                    if self.lazerDamageCounter >= other[2] or self.lazerDamageCounter == -1:
+                        self.lazerDamageCounter = 0.
+                        if not self.invincible:
+                            self.health -= other[1]
+                    lazerCollisions = True
+            if not lazerCollisions:
+                self.lazerDamageCounter = -1 # Negative one means that it's not taking damage and that it should take damage immediately once it hits a lazer.
+                        
+            if self.regenCounter >= self.regenInterval:
+                if not self.regenInterval < -1:
+                    self.health += self.maxHealth/self.regenAmount
+                self.regenCounter = 0
                     
             if self.health <= 0:
                 self.alive = False
+                
+            if self.health > self.maxHealth:
+                self.health = self.maxHealth
             
-            if self.fireCounter >= self.fireInterval:
-                self.fire()
+            # if not self.manualFiring or self.firing: # If it's automatically firing or if the player is manually firing right now.
+                # if self.fireCounter >= self.fireInterval:
+                    # self.fire()
+            # elif not self.firing and self.fireCounter > self.fireInterval:
+                # self.fireCounter = self.fireInterval
+            
+            for weapon in self.weapons:
+                weapon.update(time)
+                    
         elif not self.alive:
             self.explosionCounter += time
             
@@ -216,80 +284,92 @@ class Ship(pygame.sprite.Sprite):
         # problem is that when the explosion expires, the bullet group stops updating.
     
     def switchImage(self):
-        if self.imageState == 0:
-            self.image = self.normImgAlt
-        elif self.imageState == 1:
-            self.image = self.normImg
-        else:
-            self.imageState = 0 # Just in case of bugs, reset the animation in if it gets off somehow
+        self.imageState += 1
+        if self.imageState > self.imageStates-1:
+            self.imageState = 0
+            
+        self.image = type(self).images[self.imageState]
         self.imageChangeCounter = 0
-        self.imageState = not self.imageState # Easily change the animation to the other image.
     
     def fire(self):
         self.fireCounter = 0
         
-        firePoint = (self.fireSource[0]+self.rect.left,self.fireSource[1]+self.rect.top)
-        power = self.stats["power"]+self.bulletPowerMod
+        # firePoint = (self.fireSource[0]+self.rect.left,self.fireSource[1]+self.rect.top)
+        # power = self.stats["power"]+self.bulletPowerMod  
+        firePoint = (type(self).fireSource[0]+self.rect.left,type(self).fireSource[1]+self.rect.top)
+        power = type(self).stats["power"]+self.bulletPowerMod
         
-        self.bulletType(self.bounds, firePoint, power, parent=self, target=1, seeking=False, groups=self.bulletGroup)
+        type(self).bulletType(self.bounds, firePoint, power, self, type(self).bulletSpeed, 1, False, None, self.bulletGroup)
         # target=1 makes the bullet move to the right horizontally.
         
 class RainbowDash(Ship):
+
+    stats = {"shields":20, "power":40, "frate":55, "rrate":20}
+    folderName = os.path.join("Player Ships","Rainbow Dash")
+    filePreFix = "RD"
+    imageStates = 2
+    vectorStyle = True
     
-    def __init__(self, center, bounds, groups=[], invincible=False):
-        Ship.__init__(self, center, bounds, groups, invincible)
-        self.stats = {"shields":20, "power":40, "frate":55}
-        self.folderName = os.path.join("Player Ships","Rainbow Dash")
-        self.filePreFix = "RD"
-        self.postInit(center)
+    fireSource = (48, 17)
+    
+    bulletType = RDBullet
+    bulletSpeed = 600.
+    
+    images = []
+    
+    def __init__(self, *args):
+        Ship.__init__(self, *args)
         
-        self.fireSource = ((self.rect.width/2), (self.rect.height/2+4))
+        self.weapons.append(weapons.RDDefaultWeapon(self, (48,25)))
+        self.weapons.append(weapons.RDDefaultWeapon2(self, (48,36)))
+        self.weapons.append(weapons.RDDefaultWeapon2(self, (48,14)))
         
-        self.bulletType = RDBullet
+        Rocket.loadImages()
+        
+        self.weapons.append(weapons.RocketLauncher1(270, self, (20, 36)))
+        self.weapons.append(weapons.RocketLauncher1(90, self, (20, 36)))
+        self.weapons.append(weapons.RocketLauncher2(270, self, (20, 36)))
+        self.weapons.append(weapons.RocketLauncher2(90, self, (20, 36)))
+        self.weapons.append(weapons.SeekingMissileLauncher1(90, self, (32, 36)))
     
 class PinkiePie(Ship):
     
-    def __init__(self, center, bounds, groups=[], invincible=False):
-        Ship.__init__(self, center, bounds, groups, invincible)
-        self.stats = {"shields":60, "power":40, "frate":15}
-        self.folderName = os.path.join("Player Ships","Pinkie Pie")
-        self.filePreFix = "PP"
-        self.postInit(center)
-        
-        self.fireSource = (30, 2)
-        
-        self.bulletType = PPBullet
-
-class TwilightSparkle(Ship):
+    stats = {"shields":60, "power":40, "frate":15, "rrate":20}
+    folderName = os.path.join("Player Ships","Pinkie Pie")
+    filePreFix = "PP"
+    imageStates = 2
+    vectorStyle = False
     
-    def __init__(self, center, bounds, groups=[], invincible=False):
-        Ship.__init__(self, center, bounds, groups, invincible)
-        self.folderName = os.path.join("Player Ships","Twilight Sparkle")
-        self.filePreFix = "TS"
-        self.postInit(center)
+    fireSource = (30, 2)
+    
+    bulletType = PPBullet
+    bulletSpeed = 300.
+    
+    images = []
     
 class Fluttershy(Ship):
-        
-    def __init__(self, center, bounds, groups=[], invincible=False):
-        Ship.__init__(self, center, bounds, groups, invincible)
-        self.folderName = os.path.join("Player Ships","Fluttershy")
-        self.filePreFix = "FS"
-        self.postInit(center)
+    
+    stats = {"shields":15, "power":10, "frate":60, "rrate":100}
+    folderName = os.path.join("Player Ships","Fluttershy")
+    filePreFix = "FS"
+    imageStates = 4
+    vectorStyle = False
+    
+    fireSource = (60, 10)
+    
+    bulletType = FSBullet
+    bulletSpeed = 300.
+    
+    images = []
+
+#TODO fully implement these ones
+class TwilightSparkle(Ship):
+    pass
     
 class Applejack(Ship):
-        
-    def __init__(self, center, bounds, groups=[], invincible=False):
-        Ship.__init__(self, center, bounds, groups, invincible)
-        self.folderName = os.path.join("Player Ships","Applejack")
-        self.filePreFix = "AJ"
-        self.postInit(center)
+    pass
     
 class Rarity(Ship):
+    pass
         
-    def __init__(self, center, bounds, groups=[], invincible=False):
-        Ship.__init__(self, center, bounds, groups, invincible)
-        self.folderName = os.path.join("Player Ships","Rarity")
-        self.filePreFix = "R"
-        self.postInit(center)
-        
-shipTypes = {"PinkiePie":PinkiePie, "RainbowDash":RainbowDash, "Fluttershy":Fluttershy, "Applejack":Applejack, "Rarity":Rarity, "TwilightSparkle":TwilightSparkle}
+shipTypes = {"PinkiePie":PinkiePie, "RainbowDash":RainbowDash, "Fluttershy":Fluttershy}#, "Applejack":Applejack, "Rarity":Rarity, "TwilightSparkle":TwilightSparkle}

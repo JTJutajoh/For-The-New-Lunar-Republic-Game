@@ -14,6 +14,7 @@
 # along with For The New Lunar Republic.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys, os
+import math
 import logging
 
 log = logging.getLogger(__name__)
@@ -31,12 +32,15 @@ import bullets
 class Enemy(pygame.sprite.Sprite):
     """Base Enemy ship class"""
     def __init__(self, pos, boundingRect, bulletGroup, target, moveSpeed=60., groups=[]):
+        self.obType = "Enemy"
         pygame.sprite.Sprite.__init__(self, groups)
         
         self.imageFileName = "Enemy"
         self.explosionFileName = "ShipExplosion"
         self.folderName = "Enemy Ships"
         self.filePreFix = "Enemy"
+        
+        self.fireRange = (90,270)
         
         self.pos = pos
         self.exactPos = [self.pos[0]*1., self.pos[1]*1.]
@@ -45,7 +49,8 @@ class Enemy(pygame.sprite.Sprite):
         
         self.boundingRect = boundingRect
         
-        self.health = 200
+        self.maxHealth = 200
+        self.health = self.maxHealth*1
         
         self.alive = True
         self.explosionCounter = 0
@@ -57,15 +62,19 @@ class Enemy(pygame.sprite.Sprite):
         self.fireCounter = 0
         self.fireInterval = 500 # milliseconds
         
+        self.imageChangeCounter = 0
+        self.imageChangeInterval = 50
+        
+        self.imageState = 0
+        self.imageStates = 1
+        
         self.bulletPower = 15
         
-        self.fireSource = (5,18)
+        self.fireSource = [5,18]
         
         self.target = target
-
-    def loadImages(self):
-        self.image = pygame.image.load(os.path.join("images", self.folderName, self.filePreFix+"_"+self.imageFileName+".png"))
-        self.image.set_colorkey((0,255,0))
+        
+        self.image = type(self).images[0]
         
         self.explosionImage = pygame.image.load(os.path.join("images", self.explosionFileName+".png"))
         self.explosionRect = self.explosionImage.get_rect()
@@ -74,10 +83,28 @@ class Enemy(pygame.sprite.Sprite):
         
         self.rect = self.image.get_rect()
         self.rect.center = self.pos
-        
-    def update(self, time, bulletGroup=None):
+
+    @classmethod
+    def loadImages(cls):
+        for i in range(0,cls.imageStates):
+            completeFileName = os.path.join("images", cls.folderName, cls.imageFileName+str(i)+".png")
+            image = pygame.image.load(completeFileName).convert()
+            image.set_colorkey((0,255,0))
+            image = image.subsurface(image.get_bounding_rect())
+            cls.images.append(image)
     
+    def switchImage(self):
+        self.imageState += 1
+        if self.imageState > type(self).imageStates-1:
+            self.imageState = 0
+            
+        self.image = type(self).images[self.imageState]
+        self.imageChangeCounter = 0
+    
+    def update(self, time, bulletGroup=None):
         if self.alive:
+            self.imageChangeCounter += time
+            
             self.exactPos[0] -= self.moveSpeed*time/1000
             
             self.rect.center = (round(self.exactPos[0]),round(self.exactPos[1]))
@@ -85,6 +112,9 @@ class Enemy(pygame.sprite.Sprite):
             self.fireCounter += time
             if self.fireCounter >= self.fireInterval:
                 self.fire()
+                
+            if self.imageChangeCounter >= self.imageChangeInterval:
+                self.switchImage()
             
             for bullet in bulletGroup.sprites():
                 if bullet.rect.colliderect(self.rect):
@@ -112,14 +142,52 @@ class Enemy(pygame.sprite.Sprite):
         
     def fire(self):
         self.fireCounter = 0
+        fireSource = (type(self).fireSource[0]+self.rect.left,type(self).fireSource[1]+self.rect.top)
         
-        bullets.EnemyBullet(self.boundingRect, (self.fireSource[0]+self.rect.left,self.fireSource[1]+self.rect.top), self.bulletPower, self, self.target, False, self.bulletGroup)
+        angle = math.degrees(math.atan2(fireSource[0]-self.target.rect.centerx, fireSource[1]-self.target.rect.centery))
+        angle += 90
+        if angle > self.fireRange[0] and angle < self.fireRange[1]:
+            type(self).bulletType(self.boundingRect, fireSource, self.bulletPower, self, None, type(self).bulletSpeed, self.target, False, None, self.bulletGroup)#TODO make enemies use weapons
         
 class AlphaEnemy(Enemy):
 
-    def __init__ (self, pos, boundingRect, bulletGroup, target, moveSpeed=60., groups=[]):
-        Enemy.__init__(self, pos, boundingRect, bulletGroup, target, moveSpeed, groups)
+    fireInterval = 600
+    
+    fireRange = (130,230)
+    
+    images = []
+    
+    imageStates = 1
+    
+    imageFileName = "Enemy"
+    folderName = "Enemy Ships"
+    fireSource = (0,16)
+    bulletPower = 5
+    maxHealth = 100
+    bulletSpeed = 200.
+    
+    bulletType = bullets.EnemyBullet
         
-        self.loadImages()
+class DiamondDogRed(Enemy):
+
+    fireInterval = 250
+    
+    fireRange = (120,240)
+    
+    images = []
+    
+    imageStates = 1
+    
+    imageFileName = "DiamondDogRed"
+    folderName = "Enemy Ships"
+    fireSource = (0,32)
+    bulletPower = 5
+    maxHealth = 100
+    bulletSpeed = 200.
+    
+    bulletType = bullets.EnemyBullet
         
-enemyTypes = {"AlphaEnemy":AlphaEnemy}
+enemyTypes = {
+    "AlphaEnemy":AlphaEnemy,
+    "DiamondDogRed":DiamondDogRed
+}

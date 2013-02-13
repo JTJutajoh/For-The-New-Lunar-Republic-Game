@@ -5,7 +5,8 @@ I AM accepting help in these areas:
     Spriting. I can do basic sprites, but I'm not good when it comes down to making the good stuff. Send me one of your sprites to show me what you can do in my email (listed elsewhere),
         and I'll consider using it and adding you to the "team."
     Music. I'm currently planning on using existing fan music, such as the song this game is titled after. I can always use more music though
-        and remixes of existing themes are great too. Also, helping me loop songs like FTLR would be helpful.
+        and remixes of existing themes are great too. (UPDATE: Since Not A Clever Pony has said that video game projects are not allowed to use his music, I will have to use original music. So there's a huge need here now. I have some other songs to use of course
+        but I'll still need more.)
     Writing. I'm a decent writer, but I've never written a story for a game and I'm not perfect. You will have lots of freedom with the story, there are just some boundaries of course.
     Cutscene Art. I can do a little art, but nothing that an epic story I'm imagining deserves. I can cover this on my own if I HAVE to,
         but I'd prefer better art than I can manage. That and art takes a long  time I could be using programming.

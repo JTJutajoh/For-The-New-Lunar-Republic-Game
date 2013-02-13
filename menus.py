@@ -30,13 +30,16 @@ bm = pygame.time.Clock() # Benchmark clock
 
 class Button(pygame.sprite.Sprite):
     
-    def __init__(self, name, pos=(0,0), groups=[]):
+    def __init__(self, name, pos=(0,0), boundingRect=Rect(0,0,0,0), groups=[]):
         pygame.sprite.Sprite.__init__(self, groups)
         
         self.name = name # Used primarily to see if a button has been clicked.
         
         self.extraFolder = ""
         
+        self.boundingRect = boundingRect
+        
+        self.originalPos = pos[:]
         self.pos = pos
         
         self.state = 0 # 0:inactive 1:hovered 2:clicked 3:selected by keyboard
@@ -46,6 +49,11 @@ class Button(pygame.sprite.Sprite):
         
         self.hovered = False # Used only for checkbuttons for now.
         
+    def resetRect(self, boundingRect):
+        self.boundingRect = boundingRect
+        self.pos = [self.originalPos[0]+self.boundingRect.left, self.originalPos[1]+self.boundingRect.top]
+        self.rect.center = self.pos
+        
     def loadImages(self, imageName, posOrientation=0):
         # Logically find the other files in the same directory specifically named.
         self.images = [pygame.image.load(os.path.join("images","Buttons",self.extraFolder,imageName+".png")).convert_alpha(),
@@ -54,6 +62,13 @@ class Button(pygame.sprite.Sprite):
         
         self.image = self.images[0]
         self.rect = self.image.get_rect()
+        self.setPos(self.pos, posOrientation)
+        
+        self.resetRect(self.boundingRect)
+            
+    def setPos(self, pos, posOrientation=0):
+        self.pos = pos
+        
         #Orientation:
         #0:topleft
         #1:center
@@ -79,10 +94,24 @@ class Button(pygame.sprite.Sprite):
             
 class CharButton(Button):
     
-    def __init__(self, ship, shipDrawLoc, name, shipNameFont, pos=(0,0), groups=[]):
-        Button.__init__(self, name, pos, groups)
+    def __init__(self, ship, shipDrawLoc, name, shipNameFont, imageName, posOrientation, pos=(0,0), boundingRect=Rect(0,0,0,0), groups=[], isRadioButton=True):
+        Button.__init__(self, name, pos, boundingRect, groups)
         
-        self.ship = ship((0,0), Rect(0,0,1,1))
+        self.isRadioButton = isRadioButton
+        
+        self.extraFolder = "CharSelectButtons"
+        
+        self.shipNameFont = shipNameFont
+        
+        self.name = "SHIP_"+self.name # Add the SHIP_ prefix so that the menu handler can determine that this is a special button without checking instance types.
+        
+        self.loadImages(imageName, posOrientation)
+        
+        if not ship == None:
+            self.loadShip(ship)
+        else:
+            self.ship = None
+            
         self.shipDrawLoc = shipDrawLoc # Where on the button should the ship be drawn?
         
         # For animating the ship on the button.
@@ -90,19 +119,20 @@ class CharButton(Button):
         self.shipAltImageCounter = 0.0
         
         self.shipImageState = 0
+    
+    def setShip(self, ship):
+        if not ship is self.ship:
+            self.loadShip(ship)
+            self.genStatImage()
+    
+    def loadShip(self, ship):
+        self.ship = ship((0,0), Rect(0,0,1,1), None)
         self.shipImages = self.ship.getImages()
         self.shipImage = self.shipImages[0]
-        
-        self.shipNameFont = shipNameFont
-        
-        self.extraFolder = "CharSelectButtons"
-        
-        self.name = "SHIP_"+self.name # Add the SHIP_ prefix so that the menu handler can determine that this is a special button without checking instance types.
-        
+        self.genStatImage()
+    
     def loadImages(self, imageName, posOrientation=0):
         Button.loadImages(self, imageName, posOrientation)
-            
-        self.genStatImage()
     
     def genStatImage(self):
         # Pre-generate the stat image in order to improve performance. The stat image should not have any reason to change.
@@ -119,7 +149,9 @@ class CharButton(Button):
         xStart = 10
         xEnd = 135
         yMult = 0
-        for stat in self.ship.stats.iterkeys():
+        stats = ['power','frate','shields', 'rrate'] # Choose a specific order.
+        # for stat in self.ship.stats.iterkeys():
+        for stat in stats:
             amt = self.ship.stats[stat]
             
             lineColor = (81,102,74)
@@ -141,27 +173,27 @@ class CharButton(Button):
     def update(self, time):
         Button.update(self, time)
         
-        # Put the ship's image on the button.
-        self.shipAltImageCounter += time
-        # Animate the ship.
-        if self.shipAltImageCounter >= self.shipAltImageInterval:
-            if self.shipImageState == 0:
-                self.shipImage = self.shipImages[1]
-            elif self.shipImageState == 1:
-                self.shipImage = self.shipImages[0]
-            self.shipAltImageCounter = 0
-            self.shipImageState = not self.shipImageState
+        if not self.ship == None:
+            # Put the ship's image on the button.
+            self.shipAltImageCounter += time
+            # Animate the ship.
+            if self.shipAltImageCounter >= self.shipAltImageInterval:
+                self.shipImageState += 1
+                if self.shipImageState > self.ship.imageStates-1:
+                    self.shipImageState = 0
+                self.shipImage = self.shipImages[self.shipImageState]
+                
+                self.shipAltImageCounter = 0
         
-        self.shipImageRect = self.shipImage.get_rect()
-        self.shipImageRect.center = self.shipDrawLoc
+            self.shipImageRect = self.shipImage.get_rect()
+            self.shipImageRect.center = self.shipDrawLoc
         
 class LevelButton(Button):
     
-    def __init__(self, level, name, thumbDrawLoc, levelNameFont, pos=(0,0), groups=[]):
-        Button.__init__(self, name, pos, groups)
+    def __init__(self, level, name, thumbDrawLoc, levelNameFont, imageName, posOrientation, pos=(0,0), boundingRect=Rect(0,0,0,0), groups=[], isRadioButton=True):
+        Button.__init__(self, name, pos, boundingRect, groups)
         
-        self.level = level
-        self.thumbDrawLoc = thumbDrawLoc # Where on the button should the thumb be drawn?
+        self.isRadioButton = isRadioButton
         
         self.levelNameFont = levelNameFont
         
@@ -169,14 +201,21 @@ class LevelButton(Button):
         
         self.name = "LEVEL_"+self.name # Add the SHIP_ prefix so that the menu handler can determine that this is a special button without checking instance types.
         
+        self.loadImages(imageName, posOrientation)
+        
+        if not level == None:
+            self.setLevel(level)
+        else:
+            self.level = None
+        self.thumbDrawLoc = thumbDrawLoc # Where on the button should the thumb be drawn?
+    
+    def setLevel(self, level):
+        self.level = level
+        self.thumbImage = self.level.thumbnail
+        self.genDescripImage()
+    
     def loadImages(self, imageName, posOrientation=0):
         Button.loadImages(self, imageName, posOrientation)
-        # self.thumbImage = pygame.surface.Surface((32,32))
-        # self.thumbImage.fill((200,175,25))
-        
-        self.thumbImage = self.level.thumbnail
-            
-        self.genDescripImage()
     
     def genDescripImage(self):
         # Pre-generate the stat image in order to improve performance. The stat image should not have any reason to change.
@@ -190,23 +229,44 @@ class LevelButton(Button):
         
         # self.descripImage = pygame.surface.Surface(self.rect.size, SRCALPHA)
         description = self.level.description[0]
-        nameSurf = self.levelNameFont.render(description, True, (255,255,255))
-        nameRect = nameSurf.get_rect()
-        nameRect.centerx = self.rect.width/2
-        nameRect.top = 110
-        self.descripImage.blit(nameSurf, nameRect.topleft)
+        descripRect = Rect(7,100, 136,95)
+        descripList = [] # Break it up into separate lines.
+        # pygame.draw.rect(self.image, (0,255,0), descripRect)
+        
+        if self.levelNameFont.size(description)[0] > descripRect.width:
+            words = description.split(" ")
+            accumulatedLine = " "*2 # Indent the first line.
+            for word in words:
+                line = accumulatedLine+word+" "
+                if self.levelNameFont.size(line)[0] > descripRect.width:
+                    descripList.append(accumulatedLine)
+                    accumulatedLine = word+" "
+                else:
+                    accumulatedLine = line
+            descripList.append(accumulatedLine)
+        else:
+            descripList.append(description)
+        
+        y = descripRect.top
+        for line in descripList:
+            nameSurf = self.levelNameFont.render(line, True, (255,255,255))
+            nameRect = nameSurf.get_rect()
+            nameRect.left = descripRect.left+2
+            y += self.levelNameFont.get_height()-4
+            self.descripImage.blit(nameSurf, (nameRect.left, y))
     
     def update(self, time):
         Button.update(self, time)
         
-        self.thumbImageRect = self.thumbImage.get_rect()
-        self.thumbImageRect.center = self.thumbDrawLoc
+        if not self.level == None:
+            self.thumbImageRect = self.thumbImage.get_rect()
+            self.thumbImageRect.center = self.thumbDrawLoc
              
 class CheckButton(Button):
     # Intended for the settings screen.
     
-    def __init__(self, name, pos=(0,0), initialState=False, groups=[]):
-        Button.__init__(self, name, pos, groups)
+    def __init__(self, name, pos=(0,0), boundingRect=Rect(0,0,0,0), initialState=False, groups=[]):
+        Button.__init__(self, name, pos, boundingRect, groups)
         
         self.extraFolder = "SettingsButtons"
         
@@ -241,13 +301,19 @@ class Menu(pygame.sprite.Group):
         self.checkedButtons = []
         
         self.allowKeys = allowKeys
+            
+        self.rect = rect
         
         if not bgImage == None:
             self.bgImage = bgImage
             
-        self.rect = rect
+            self.bgRect = self.bgImage.get_rect()
+            self.bgRect.center = self.rect.center
         
         self.textInfo = textInfo
+        
+        self.shipButtons = []
+        self.levelButtons = []
         
         self.reinit()
     
@@ -255,27 +321,35 @@ class Menu(pygame.sprite.Group):
         self.pressedButton = None
         self.pressedShipButton = None # This is for selecting ships on the ship select screen only. It allows the ship select buttons to work independently from the other button(s)
         self.pressedLevelButton = None
+        
         for button in self.buttons:
             button.state = 0
         self.selectedButton = 0 # -1 means that no selection has been made.
     
+    def resetRects(self, boundingRect):
+        self.rect = boundingRect
+        for button in self.sprites():
+            button.resetRect(boundingRect)
+    
     def makeNewButton(self, name, images, pos, posOrientation=1, type=Button):
-        newButton = type(name, pos, self)
+        newButton = type(name, pos, self.rect, self)
         newButton.loadImages(images, posOrientation)
         self.buttons.append(newButton)
         
-    def makeNewLevelSelectButton(self, level, name, thumbDrawLoc, images, pos, levelNameFont, posOrientation=1):
-        newButton = LevelButton(level, name, thumbDrawLoc, levelNameFont, pos, self)
-        newButton.loadImages(images, posOrientation)
+    def makeNewLevelSelectButton(self, level, name, thumbDrawLoc, images, pos, levelNameFont, posOrientation=1, radioButton=True):
+        newButton = LevelButton(level, name, thumbDrawLoc, levelNameFont, images, posOrientation, pos, self.rect, self, radioButton)
+        # newButton.loadImages(images, posOrientation)
         self.buttons.append(newButton)
+        self.levelButtons.append(newButton)
         
-    def makeNewCharSelectButton(self, ship, shipDrawLoc, name, images, pos, shipNameFont, posOrientation=1):
-        newButton = CharButton(ship, shipDrawLoc, name, shipNameFont, pos, self)
-        newButton.loadImages(images, posOrientation)
+    def makeNewCharSelectButton(self, ship, shipDrawLoc, name, images, pos, shipNameFont, posOrientation=1, radioButton=True):
+        newButton = CharButton(ship, shipDrawLoc, name, shipNameFont, images, posOrientation, pos, self.rect, self, radioButton)
+        # newButton.loadImages(images, posOrientation)
         self.buttons.append(newButton)
+        self.shipButtons.append(newButton)
         
     def makeNewCheckButton(self, name, images, pos, initialState, posOrientation=1):
-        newButton = CheckButton(name, pos, initialState, self)
+        newButton = CheckButton(name, pos, self.rect, initialState, self)
         newButton.loadImages(images, posOrientation)
         self.buttons.append(newButton)
     
@@ -295,21 +369,23 @@ class Menu(pygame.sprite.Group):
                     elif not button.state == 3:
                         button.state = 0
                     
+                    # Make the menu work with the keyboard (Currently not working right)
+                    #TODO
                     if self.allowKeys:
                         if K_w in pressedKeys:
                             self.selectedButton -= 1
                         elif K_s in pressedKeys:
                             self.selectedButton += 1
                        
-                    #TODO make menus repeat
-                    if self.selectedButton > len(self.buttons)-1:
-                        self.selectedButton = len(self.buttons)-1
-                    elif self.selectedButton < 0:
-                        self.selectedButton = 0
-                    
-                    if self.allowKeys:
+                        #TODO make menus repeat (Only relevant to keyboard input.)
+                        if self.selectedButton > len(self.buttons)-1:
+                            self.selectedButton = len(self.buttons)-1
+                        elif self.selectedButton < 0:
+                            self.selectedButton = 0
+                        
                         self.buttons[self.selectedButton].state = 1
                     
+                    # Check for mouse clicks and act accordingly.
                     for e in mouseEvents:
                         if e.button == 1:
                             if button.state == 1 or button.state == 3:
@@ -342,7 +418,16 @@ class Menu(pygame.sprite.Group):
                         if K_RETURN in pressedKeys:
                             if button.state == 1 or button.state == 3:
                                 button.state = 2
-                                
+                    
+                    # If the mainloop is manually choosing a character button or level button, then make it work right.
+                    if not self.pressedShipButton == None:
+                        for button in self.buttons:
+                            if button.name == self.pressedShipButton:
+                                button.state = 2
+                    if not self.pressedLevelButton == None:
+                        for button in self.buttons:
+                            if button.name == self.pressedLevelButton:
+                                button.state = 2
                                 
                 if button.state == 2:
                     if not "SHIP_" in button.name and not "CHECK_" in button.name and not "LEVEL_" in button.name:
@@ -350,28 +435,36 @@ class Menu(pygame.sprite.Group):
                     elif "CHECK_" in button.name:
                         pass
                     elif "LEVEL_" in button.name:
-                        if not button.name == self.pressedLevelButton:
-                            button.state = 0
-                    else:
-                        if not button.name == self.pressedShipButton:
-                            button.state = 0
+                        if button.isRadioButton:
+                            if not button.name == self.pressedLevelButton:
+                                button.state = 0
+                        else:
+                            self.pressedButton = button.name
+                    elif "SHIP_" in button.name:
+                        if button.isRadioButton:
+                            if not button.name == self.pressedShipButton:
+                                button.state = 0
+                        else:
+                            self.pressedButton = button.name
             else:
                 self.remove(button) # If the button is set to be hidden.
                 
     def draw(self, surf):
-        surf.blit(self.bgImage, self.rect.topleft)
+        surf.blit(self.bgImage, self.bgRect.topleft)
         pygame.sprite.Group.draw(self, surf)
         # Put the button's ship and stat info on the button
         for button in self.buttons:
             if "SHIP_" in button.name:
-                surf.blit(button.statImage, button.rect.topleft)
-                shipLoc = button.shipImageRect.topleft
-                surf.blit(button.shipImage, (shipLoc[0]+button.rect.left, shipLoc[1]+button.rect.top))
-                # Blit them directly to surf so that the game will run faster in case surf is the display surface.
+                if not button.ship == None:
+                    surf.blit(button.statImage, button.rect.topleft)
+                    shipLoc = button.shipImageRect.topleft
+                    surf.blit(button.shipImage, (shipLoc[0]+button.rect.left, shipLoc[1]+button.rect.top))
+                    # Blit them directly to surf so that the game will run faster in case surf is the display surface.
             elif "LEVEL_" in button.name:
-                surf.blit(button.descripImage, button.rect.topleft)
-                thumbLoc = button.thumbImageRect.topleft
-                surf.blit(button.thumbImage, (thumbLoc[0]+button.rect.left, thumbLoc[1]+button.rect.top))
+                if not button.level == None:
+                    surf.blit(button.descripImage, button.rect.topleft)
+                    thumbLoc = button.thumbImageRect.topleft
+                    surf.blit(button.thumbImage, (thumbLoc[0]+button.rect.left, thumbLoc[1]+button.rect.top))
         
         # Blit all the header text
         for header in self.textInfo.iterkeys():
@@ -379,5 +472,5 @@ class Menu(pygame.sprite.Group):
             textRect = textSurf.get_rect()
             textRect.center = self.textInfo[header]["Loc"] # Assumes all header text is centered #TODO maybe make this more flexible
         
-            surf.blit(textSurf, textRect.topleft)
+            surf.blit(textSurf, (textRect.left+self.rect.left, textRect.top+self.rect.top))
  

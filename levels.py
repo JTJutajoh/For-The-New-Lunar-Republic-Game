@@ -23,9 +23,13 @@ log = logging.getLogger(__name__)
 
 import pygame
 from pygame.locals import *
+import elementtree.ElementTree as ET
 
 import enemies
+import bosses
 import bullets
+import hud
+import dialog
 
 log.debug("Module initialized.")
 
@@ -33,42 +37,59 @@ bm = pygame.time.Clock()
 
 class LevelBackground(pygame.sprite.Sprite):
     
-    def __init__(self, boundingRect, timeRemaining, image, moveSpeed=0, groups=[], initialx=0):
+    def __init__(self, boundingRect, timeRemaining, image, moveSpeed=0, groups=[], initialx=0, layer=0):
         pygame.sprite.Sprite.__init__(self, groups)
         self.image = image
         self.rect = self.image.get_rect()
         self.rect.left = initialx
+        self.rect.top = boundingRect.top
         
         self.boundingRect = boundingRect
         
         self.distance = self.rect.width-boundingRect.width
         self.timeRemaining = timeRemaining
         
-        if moveSpeed == 0:
-            self.moveSpeed = self.distance/(self.timeRemaining/1000.)
+        if moveSpeed == -1:
+            self.moveSpeed = self.distance/(self.timeRemaining/1000.) # Set it so that it will repeat exactly once in the time it takes for the level to end.
         else:
             self.moveSpeed = moveSpeed
+        # self.moveSpeed = moveSpeed
         
         self.x = initialx
         
+        self.repeatedBG = None
+        
         self.repeated = False
+        
+        self.layer = layer
         
     def update(self, time):
         self.x -= self.moveSpeed*time/1000.
         self.rect.left = self.x
-        if self.rect.right <= self.boundingRect.right and not self.repeated:
-            self.groups()[0].add(LevelBackground(self.boundingRect, self.timeRemaining, self.image, self.moveSpeed, initialx=self.rect.right))
-            self.repeated = True # Make sure it only spawns a new image ONCE.
-        if self.rect.right < self.boundingRect.left:
-            self.kill()
+        
+        if self.rect.right <= self.boundingRect.left:
+            self.x = self.boundingRect.left
 
+class BackgroundGroup(pygame.sprite.OrderedUpdates):
+    
+    def __init__(self, boundingRect, *args):
+        pygame.sprite.OrderedUpdates.__init__(self, *args)
+        
+        self.boundingRect = boundingRect
+        
+    def draw(self, surface):
+        for sprite in self.sprites():
+            surface.blit(sprite.image, sprite.rect.topleft)
+            if sprite.rect.right <= sprite.boundingRect.right:
+                surface.blit(sprite.image, sprite.rect.topright)
+            
 class Level(object):
     """Information a level class (or object) needs to have:
-    Background image(s)
-    Background music
-    Enemy info (location, time, type, etc.)
-    Dialog information for story mode. (Or tutorial)
-    Opening and closing cutscene info. (Optional for levels)"""
+        Background image(s)
+        Background music
+        Enemy info (location, time, type, etc.)
+        Dialog information for story mode. (Or tutorial)
+        Opening and closing cutscene info. (Optional for levels)"""
     # Current vision for structure:
     # A list of levels is created from the LEVELS file
     # This module loads that list
@@ -80,19 +101,23 @@ class Level(object):
     
     # Separate expensive things like loading images from the init function. This way the menu can get the info it needs without having to use too much memory for unneeded stuff.
     
-    def __init__(self, name):
+    def __init__(self, name, levelName=None):
         self.name = name
+        if not levelName == None:
+            self.levelName = levelName
+        else:
+            self.levelName = self.name
         
-        self.thumbnail = pygame.image.load(os.path.join("levels",self.name,"Thumbnail.png")).convert()
+        self.thumbnail = pygame.image.load(os.path.join("levels",self.levelName,"Thumbnail.png")).convert()
         
-        descripFileName = os.path.join("levels",self.name,"description.txt")
+        descripFileName = os.path.join("levels",self.levelName,"description.txt")
         self.description = file(descripFileName, 'r').readlines()
     
     def parseInfoFile(self):
         # I'm choosing to comment this function heavily since it took me hours to write and I still barely understood it once I finally had it working
         #so I'm making sure that I can figure it out again if I ever need to change it or something.
         # So forgive the comments explaining the obvious.
-        levelInfoFile = file(os.path.join("levels",self.name,"levelInfo"), 'r').readlines()
+        levelInfoFile = file(os.path.join("levels",self.levelName,"levelInfo"), 'r').readlines()
         self.levelInfo = {"GeneralInfo":{}} # For some reason it gives a keyerror if I don't define GeneralInfo now.
         # levelIinfo DOES NOT contain background info. That goes into the dictionary bgInfo (Defined later).
         
@@ -123,8 +148,6 @@ class Level(object):
                 key = line[:line.index(":")] # Get the text before the colon.
                 value = line[line.index(":")+1:].strip() # Get the text after the colon.
                 self.levelInfo[s][key] = value
-                
-        log.info("Level Info: %s"%self.levelInfo) # Debugging purposes.
         
         
         
@@ -157,13 +180,9 @@ class Level(object):
                 value = line[line.index(":")+1:].strip() # Get the text after the colon.
                 self.bgInfo[bg][key] = value
         
-        self.bgGroup = pygame.sprite.OrderedUpdates()
-        for i in range(0,int(self.levelInfo["GeneralInfo"]['bglevels'])):
-            fileName = os.path.join("levels",self.name,"Background-%i.png"%(i))
-            self.backgroundImages.append(pygame.image.load(fileName).convert_alpha())
     
     def parseEnemyFile(self):
-        fileName = os.path.join("levels",self.name,"enemies")
+        fileName = os.path.join("levels",self.levelName,"enemies")
         enemiesFile = file(fileName, 'r').readlines()
         
         self.enemies = []
@@ -182,7 +201,7 @@ class Level(object):
             name = line[sepLocs[1]+1:]
             self.enemies.append([time,initialy,name])
     
-    def load(self, boundingRect, ship, folders):
+    def load(self, boundingRect, ship, folders, warningFont):
         self.boundingRect = boundingRect
         
         self.backgroundImages = []
@@ -190,10 +209,14 @@ class Level(object):
         self.parseInfoFile()
         self.parseEnemyFile()
         
-        for i in self.backgroundImages:
-            info = self.bgInfo[str(self.backgroundImages.index(i))]
+        self.bgGroup = BackgroundGroup(self.boundingRect)
+        for i in range(0,int(self.levelInfo["GeneralInfo"]['bglevels'])):
+            fileName = os.path.join("levels",self.levelName,"Backgrounds","Background-%i.png"%(i))
+            image = pygame.image.load(fileName).convert_alpha()
+            info = self.bgInfo[str(i)]
             moveSpeed = int(info["moveSpeed"])
-            LevelBackground(self.boundingRect, self.timeRemaining, i, moveSpeed, self.bgGroup)
+            LevelBackground(self.boundingRect, self.timeRemaining, image, moveSpeed, self.bgGroup, layer=i)
+        
         self.backgroundSurface = pygame.surface.Surface(self.boundingRect.size)
         
         self.done = False
@@ -201,35 +224,78 @@ class Level(object):
         
               
         self.ship = ship
+        ship.loadImages()
+        type(ship).bulletType.loadImages()
         self.playerGroup = pygame.sprite.RenderUpdates(self.ship)
-         
+        
+        
+        for enemy in self.enemies:
+            enemies.enemyTypes[enemy[2]].loadImages()
+            bType = enemies.enemyTypes[enemy[2]].bulletType
+            bType.loadImages()
         self.enemyBulletGroup = pygame.sprite.Group()
         
-        self.enemyAddInterval = 5000
-        # if stressTest:
-            # enemyAddInterval = STEnemyInterval
-        self.enemyAddTimer = self.enemyAddInterval
+        self.otherDamagingRects = [] # This is a list of rects that damage the player when touched. As of writing this comment, used only for lazers.
+        self.lazerRects = []
         
         self.enemyGroup = pygame.sprite.RenderUpdates()
         
+        self.bossWaitCounter = 0.
+        self.bossWaitTime = 5000. # Time to wait before showing the boss, in milliseconds.
+        self.bossGroup = bosses.BossGroup()
+        self.boss = bosses.Boss(self, (self.boundingRect.right-175,self.boundingRect.centery), self.boundingRect, self.bossGroup)
+        self.inBoss = False
+        
+        # These are used by the story object to display dialog before the boss shows up.
+        self.readyForBoss = False
+        self.waitingForBoss = False
+        
+        self.bossWarningText = None # This is defined as a string later when the boss is on its way. The draw function checks if it's None and renders the string otherwise.
+        self.warningFont = warningFont
+        self.bossWarningColor = (200,25,25)
+        self.bossWarningFlashCounter = 0.
+        self.bossWarningFlashInterval = 100.
+        
         currentSong = self.levelInfo["GeneralInfo"]['song']
         pygame.mixer.music.load(os.path.join(folders['music'], currentSong+".wav"))
+        
+        self.loadDialog()
             
     def update(self, pressedKeys, time):
-        #TODO take all management from the mainloop and put it here.
         # Handle backgrounds and such
         self.timeRemaining -= time
         self.runTimeSoFar += time
         
-        if self.timeRemaining <= 0:
-            self.done = True #TODO make boss battles instead.
+        # if self.timeRemaining <= 0:
+            # self.done = True #TODO make boss battles instead.
+            
+        if len(self.enemies) == 0 and len(self.enemyGroup) == 0:
+            if not self.inBoss:
+                self.waitingForBoss = True
+            if self.readyForBoss:
+                if self.bossWaitCounter < self.bossWaitTime:
+                    self.bossWaitCounter += time
+                    self.bossWarningText = "WARNING %i UNTIL BOSS ARRIVES"%((self.bossWaitTime-self.bossWaitCounter)/1000.)
+                    self.bossWarningFlashCounter += time
+                    self.inBoss = False
+                else:
+                    self.inBoss = True
+                    # self.waitingrForBoss = False
+                    self.bossWarningText = None
+                    self.bossGroup.update(time)
+                if not self.boss.alive:
+                    self.done =  True # If the last ship is dead and the boss is no longer living.
+            #TODO make boss battles instead
         
         self.backgroundSurface.fill((0,0,0))
         self.bgGroup.update(time)
         
         # Handle game logic.
         self.enemyBulletGroup.update(time)
-        self.playerGroup.update(pressedKeys, time, self.enemyBulletGroup)
+        if self.inBoss:
+            self.playerGroup.update(pressedKeys, time, self.boss.bulletGroup, self.otherDamagingRects, self.lazerRects)
+        else:
+            self.playerGroup.update(pressedKeys, time, self.enemyBulletGroup, self.otherDamagingRects, self.lazerRects)
         
         if len(self.playerGroup.sprites()) == 0:
             self.gameOver = True
@@ -248,11 +314,39 @@ class Level(object):
     def draw(self, surface):
         self.bgGroup.draw(surface)
         
+        if self.inBoss:
+            self.lazerRects = []
+            self.bossGroup.draw(surface)
+        
         self.enemyGroup.draw(surface)
+        # Draw enemy health bars
+        for enemy in self.enemyGroup:
+            if enemy.alive:
+                percentage = (enemy.health*1./enemy.maxHealth*1.)
+                barLength = 32. # Pixels
+                barFullness = percentage*barLength
+                rect = Rect(0,0, barFullness, 2)
+                rect.center = (enemy.rect.centerx, enemy.rect.top-6)
+                pygame.draw.rect(surface, (255,255,255), rect.inflate(2,2))
+                pygame.draw.rect(surface, (50,200,50), rect)
         self.playerGroup.draw(surface)
         self.enemyBulletGroup.draw(surface)
         for ship in self.playerGroup.sprites():
             ship.bulletGroup.draw(surface)
+            
+        if not self.bossWarningText == None:
+            if self.bossWarningFlashCounter >= self.bossWarningFlashInterval:
+                self.bossWarningFlashCounter = 0.
+                
+                if self.bossWarningColor == (200,25,25):
+                    self.bossWarningColor = (255,255,255)
+                else:
+                    self.bossWarningColor = (200,25,25)
+            textSurf = self.warningFont.render(self.bossWarningText, True, self.bossWarningColor)
+            textRect = textSurf.get_rect()
+            textRect.center = self.boundingRect.center
+            
+            surface.blit(textSurf, textRect.topleft)
             
         
 class ArcadeLevel(Level):
@@ -260,10 +354,33 @@ class ArcadeLevel(Level):
     def __init__(self, name):
         Level.__init__(self, name)
         
+    def loadDialog(self):
+        pass
+        
+    def load(self, *args):
+        Level.load(self, *args)
+        self.waitingForBoss = False
+        self.readyForBoss = True
+        
 class StoryLevel(Level):
     
     def __init__(self, name):
         Level.__init__(self, name)
+        
+    def loadDialog(self):
+        fileName = os.path.join("levels",self.name,"Dialog.xml")
+        tree = ET.parse(fileName)
+        root = tree.getroot()
+        
+        self.dialogSections = []
+        
+        for element in root:
+            if element.tag == "dialogSection":
+                newList = []
+                for e in element:
+                    if element.tag == "dialog":
+                        newList.append(e)
+                self.dialogSections.append(newList)
         
 
 levelInfoFile = file(os.path.join("Levels","LEVELS.txt"), 'r')

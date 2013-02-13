@@ -1,8 +1,22 @@
-Implemented logging. There are two separate handlers for the log file and the console window. They default to DEBUG and WARNING respectively.
-Made the game pause when it loses focus.
-Somehow managed to break the no scaling option in fullscreen. For now that's going to remain broken.
-Added a working fullscreen toggle to the settings screen. It saves your setting in the cfg file too.
-Added a working settings button to the pause menu. It saves your current position in the game too.
-Added a level selection screen for Arcade mode. It's slightly incomplete, but the rest will have to wait for implementation of levels themselves. (Like thumbnails and descriptions.)
-Added sound option to settings screen. It saves to your cfg file too.
-Added levels. It's too complicated for this file to list everything about them. I'll list everything about them on the tumblr blog.
+Made it possible to manually fire the ship instead of automatically. (Requested feature)
+Fixed bug where pushing the back button from the level selection menu would put the ship selection menu into a strange state.
+Added HUD.
+Added regen rate stat. This determines how quickly the ship regenerates.
+Gave enemies health bars.
+Improved the way that images are handled by sprites. They are only loaded once per image and at the loading of a level.
+Fixed background scrolling bug.
+Added bosses. There's a warning string that flashes on screen when the boss is incoming that counts down to its arrival.
+Gave bosses turrets that track the player. They don't fire yet (As of adding this line to the release notes.)
+Put a boss health bar at the top of the screen.
+Completed basic implementation of bosses. As of this line there's still a bit of work to be done. Refine the hp bar, make it load its info from a file instead of being hard coded, etc.
+Attempted to improve the way bullets move, but it doesn't seem to really have had any difference.
+Added three types of turrets to bosses: Fixed, Tracking, and Lazer.
+Consolidated menus. Added arcade menu that has default character and level selected. Saves four mouse clicks. Also removed the game mode select menu altogether and just put the game modes on the main menu.
+Added the ability for ships to use a vector style instead of pixel art. This will become the standard in the future.
+Implemented cutscenes. Only accessible through the story mode which is disabled unless you know the correct command argument.
+Implemented dialog. Disabled just like cutscenes.
+Brought the bitrates of the music files back down to sensible levels. Lowering the overall filesize. Sorry about that, that's what you get for using freeware audio converters.
+Mostly re-implemented noscaling in fullscreen mode. It doesn't work ingame yet, but it seems to work perfectly in menus and most likely in cutscenes and dialog.
+Implemented in-game dialog. There's a a placeholder right now before the boss. But I did it in such a way that it can go almost anyway you want it to.
+Started adding other kinds of weapons. And the ability for ships to have more than one kind of weapon at once.
+Made backgrounds work for dialog sequences. Also finished working on the cutscenes.

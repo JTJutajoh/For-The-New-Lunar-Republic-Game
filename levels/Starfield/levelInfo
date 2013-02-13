@@ -1,0 +1,15 @@
+#GeneralInfo
+id:0
+song:You Gotta Glitch
+time:600
+bglevels:3
+
+#foobar
+
+#BackgroundInfo
+-0
+moveSpeed:30
+-1
+moveSpeed:50
+-2
+moveSpeed:75

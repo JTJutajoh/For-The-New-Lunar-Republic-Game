@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<cutscenes>
+    <cutscene id="PinkiePlaceholder" bg="CutsceneBG.png">
+        <background name="CutsceneBG">CutsceneBG.png</background>
+        <dialog speaker="Pinkie Pie" mood="Normal" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG">This is my placeholder dialog. I'm not really sure what that means, but the programmer told me that it's important that I say it. So here I am saying it. Oh and he also told me to say that this line should word-wrap.</dialog>
+        <dialog speaker="Pinkie Pie" mood="Confused" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG">Well I'm not really sure what he wants me to say, but what can you do?</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="10" waitsforuser="1" pausetime="0" bg="CutsceneBG">Oh look! I can talk really fast! I can say so much more in such a fast time! How EXCITING!</dialog>
+        <dialog speaker="Pinkie Pie" mood="Sad" speed="0.3" waitsforuser="1" pausetime="0" bg="CutsceneBG">ORRRR I can talk reeeeeeaaaalllly slooooowwllllyyyyy...</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG">But why would I want to do THAT?</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Confused" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG">WHO are you TALKING to, Pinkie?!</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="50" waitsforuser="1" pausetime="0" bg="CutsceneBG">Them!</dialog>
+        <dialog speaker="Pinkie Pie" mood="Normal" speed="1" waitsforuser="1" pausetime="2000" bg="CutsceneBG">Oh, by the way. This dialog and the next one won't wait for you to push a button.</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Angry" speed="0.075" waitsforuser="1" pausetime="3000" bg="CutsceneBG">...</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG">Anyway, that concludes the placeholder dialog. I guess we have to get back to saving the world and stuffs... Bye!</dialog>
+    </cutscene>
+</cutscenes>

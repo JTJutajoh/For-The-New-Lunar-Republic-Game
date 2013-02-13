@@ -1,0 +1,7 @@
+*.pyc
+*.cfg
+*.log
+*.xcf
+
+*.mp3
+*.wav

@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<cutscenes>
+    <cutscene id="OpeningDialog" bg="Placeholder" type="Cutaway">
+        <background name="Placeholder">CutsceneBG.png</background>
+        <background name="Frame 0.1">Frame 0.1.png</background>
+        <background name="Frame 0">Frame 0.png</background>
+        <background name="Frame 1">Frame 1.png</background>
+        <background name="PaS">Planet and Sun.png</background>
+        <dialog speaker="Mystery" mood="All" waitsforuser="2" pausetime="7500" bg="PaS" bgFade="in" bgFadeTime="3000">It's time to wake up.</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="2" pausetime="3000" bg="PaS" bgFade="out" bgFadeTime="3000">No really, wake up Twilight.</dialog>
+    </cutscene>
+    <cutscene id="OpeningDialogOld2" bg="Placeholder" type="Cutaway">
+        <background name="Placeholder">CutsceneBG.png</background>
+        <background name="Blank">Blank.png</background>
+        <background name="Frame 0.1">Frame 0.1.png</background>
+        <background name="Frame 0">Frame 0.png</background>
+        <background name="Frame 1">Frame 1.png</background>
+        <pause time="2500" skipable="0" bg="Frame 0.1" bgFade="in" bgFadeTime="2500" />
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">She's waking up.</dialog>
+        <pause time="1000" skipable="0" bg="Frame 0.1" bgFade="none" />
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">I'm sorry Miss Sparkle, but you're not ready yet.</dialog>
+        <dialog speaker="Mystery" mood="All" speed="1" waitsforuser="1" bg="Frame 0.1" bgFade="none">You need to sleep...</dialog>
+        <pause time="2500" skipable="0" bg="Frame 0.1" bgFade="out" bgFadeTime="2500" />
+        <pause time="2500" skipable="0" bg="Frame 0" bgFade="in" bgFadeTime="2500" />
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0" bgFade="none">Twilight?</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0" bgFade="none">Twilight Sparkle?</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0" bgFade="out" bgFadeTime="2500">She's going under again Princess.</dialog>
+        <pause time="2500" skipable="0" bg="Frame 0.1" bgFade="in" bgFadeTime="2500" />
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">Twilight?</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Tired" waitsforuser="1" bg="Frame 0.1" bgFade="none">Princess?</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">She's responsive!</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">Shhh Miss Sparkle, you need to rest. You've been asleep for a long time.</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Tired" waitsforuser="1" bg="Frame 0.1" bgFade="none">What's going on Princess? Where am I?</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">That doesn't matter right now. What matters is how you're feeling.</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Tired" waitsforuser="1" bg="Frame 0.1" bgFade="none">Where... Where are my friends?</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">Don't worry, your friends are safe. You'll get to see them soon.</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">How are you feeling?</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Tired" waitsforuser="1" bg="Frame 0.1" bgFade="none">I feel... Tired. And cold.</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">That's to be expected. It will pass with plenty of rest.</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Tired" waitsforuser="1" bg="Frame 0.1" bgFade="none">Princess, what happened?</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">As I said, you've been asleep a long time. I'll explain more later when you're ready. First you need to rest up so you can meet your friends again.</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Tired" waitsforuser="1" bg="Frame 0.1" bgFade="none">Alright...</dialog>
+        <dialog speaker="Mystery" mood="All" waitsforuser="1" bg="Frame 0.1" bgFade="none">We'll wake you when the time comes.</dialog>
+        <pause time="2500" skipable="0" bg="Frame 0.1" bgFade="out" bgFadeTime="2500" />
+    </cutscene>
+    <cutscene id="OpeningDialogOld" bg="Placeholder" type="Cutaway">
+        <background name="Placeholder">CutsceneBG.png</background>
+        <background name="Blank">Blank.png</background>
+        <background name="Frame 0.1">Frame 0.1.png</background>
+        <background name="Frame 0">Frame 0.png</background>
+        <background name="Frame 1">Frame 1.png</background>
+        <pause time="2500" skipable="0" bg="Frame 0.1" bgFade="in" bgFadeTime="2500" />
+        <dialog speed="0.5" waitsforuser="2" pausetime="2000" bg="Frame 0.1" bgFade="none">I think they're waking up.</dialog>
+        <pause time="1000" skipable="0" bg="Frame 0.1" bgFade="none" />
+        <dialog speed="0.75" waitsforuser="2" pausetime="1500" bg="Frame 0.1" bgFade="none">We aren't ready yet!</dialog>
+        <dialog speed="0.75" waitsforuser="2" pausetime="2000" bg="Frame 0.1" bgFade="none">Someone go get the Princess! NOW!</dialog>
+        <pause time="2500" skipable="0" bg="Frame 0.1" bgFade="out" bgFadeTime="2500" />
+        <pause time="2500" skipable="0" bg="Frame 0" bgFade="in" bgFadeTime="2500" />
+        <dialog speed="0.75" waitsforuser="2" pausetime="1500" bg="Frame 0" bgFade="none">They're coming to!</dialog>
+        <dialog speed="0.75" waitsforuser="2" pausetime="1500" bg="Frame 0" bgFade="none">No, we're losing them!</dialog>
+        <pause time="2500" skipable="0" bg="Frame 0" bgFade="out" bgFadeTime="2500" />
+        <pause time="2500" skipable="0" bg="Frame 1" bgFade="in" bgFadeTime="2500" />
+        <dialog speed="0.5" waitsforuser="1" pausetime="0" bg="Frame 1" bgFade="none">Welcome to the land of the living.</dialog>
+        <dialog speed="0.75" waitsforuser="1" pausetime="0" bg="Frame 1" bgFade="none">It might take you several hours to adjust. You've been asleep a very long time.</dialog>
+        <dialog speed="0.5" waitsforuser="1" pausetime="0" bg="Frame 1" bgFade="none">A very long time indeed.</dialog>
+    </cutscene>
+    <cutscene id="PinkiePlaceholder" bg="CutsceneBG.png" type="Cutaway">
+        <background name="CutsceneBG">CutsceneBG.png</background>
+        <dialog speaker="Pinkie Pie" mood="Normal" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="in" bgFadeTime="1000">This is my placeholder dialog. I'm not really sure what that means, but the programmer told me that it's important that I say it. So here I am saying it. Oh and he also told me to say that this line should word-wrap.</dialog>
+        <dialog speaker="Pinkie Pie" mood="Confused" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="none">Well I'm not really sure what he wants me to say, but what can you do?</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="10" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="none">Oh look! I can talk really fast! I can say so much more in such a fast time! How EXCITING!</dialog>
+        <dialog speaker="Pinkie Pie" mood="Sad" speed="0.3" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="none">ORRRR I can talk reeeeeeaaaalllly slooooowwllllyyyyy...</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="none">But why would I want to do THAT?</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Confused" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="none">WHO are you TALKING to, Pinkie?!</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="50" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="none">Them!</dialog>
+        <dialog speaker="Pinkie Pie" mood="Normal" speed="1" waitsforuser="1" pausetime="2000" bg="CutsceneBG" bgFade="none">Oh, by the way. This dialog and the next one won't wait for you to push a button.</dialog>
+        <dialog speaker="Twilight Sparkle" mood="Angry" speed="0.075" waitsforuser="1" pausetime="3000" bg="CutsceneBG" bgFade="none">...</dialog>
+        <dialog speaker="Pinkie Pie" mood="Happy" speed="1" waitsforuser="1" pausetime="0" bg="CutsceneBG" bgFade="out" bgFadeTime="1000">Anyway, that concludes the placeholder dialog. I guess we have to get back to saving the world and stuffs... Bye!</dialog>
+    </cutscene>
+    <cutscene id="InGamePlaceholder" type="InGame">
+        <dialog speaker="Rainbow Dash" mood="Confused" speed="1" waitsforuser="0" pausetime="2000" bgFade="none">There's something on our scanners! And it's big!</dialog>
+        <dialog speaker="Rainbow Dash" mood="Scared" speed="0.25" waitsforuser="0" pausetime="2000" bgFade="none">Oh... My... Celestia... What is that thing?!</dialog>
+    </cutscene>
+</cutscenes>
